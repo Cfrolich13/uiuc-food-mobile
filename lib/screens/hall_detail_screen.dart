@@ -281,7 +281,7 @@ class _MealViewState extends State<_MealView> {
     return Scrollbar(
       controller: _scroll,
       interactive: true,
-      child: ListView(
+      child: ExactScrollList(
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),

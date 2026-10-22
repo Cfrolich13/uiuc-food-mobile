@@ -163,26 +163,7 @@ void main() {
 
   testWidgets('a single-station meal is split into collapsible courses', (tester) async {
     // Real capture: LAR's lunch is one "LAR" line with many courses.
-    final api = IllinoisDiningApi(client: MockClient((request) async {
-      final name = switch (request.url.path) {
-        '/MobileAppWS/api/LocationSchedules' => 'location_schedules.json',
-        '/MobileAppWS/api/Menu/5/10-22-2026' => 'menu_5_2026-10-22.json',
-        _ => null,
-      };
-      return name == null
-          ? http.Response('[]', 200)
-          : http.Response.bytes(File('test/fixtures/$name').readAsBytesSync(), 200);
-    }));
-    final now = DateTime(2026, 10, 22, 12, 10);
-    await tester.binding.setSurfaceSize(const Size(430, 932));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(IlliniDiningApp(
-      repository: DiningRepository(
-          diningApi: api, balanceApi: DemoDiningApi(latency: Duration.zero), cache: MemoryCache(), now: () => now),
-      preferences: await SharedPreferences.getInstance(),
-      clock: Clock(() => now),
-    ));
-    await tester.pumpAndSettle();
+    await _pumpWithLiveCapture(tester);
     await tester.tap(find.text('Lincoln/Allen Dining Hall at Lincoln/Allen (LAR)'));
     await tester.pumpAndSettle();
 
@@ -197,6 +178,28 @@ void main() {
     await tester.tap(find.text('Entrees'));
     await tester.pumpAndSettle();
     expect(find.text(lunch.first['FormalName'] as String), findsOneWidget);
+  });
+
+  testWidgets('scroll extent stays exact while scrolling a menu', (tester) async {
+    // A lazy list estimates its length from the children built so far, so
+    // mixing collapsed and expanded stations made the scrollbar jump.
+    await _pumpWithLiveCapture(tester);
+    await tester.tap(find.text('Ikenberry Dining Center at Ikenberry Commons'));
+    await tester.pumpAndSettle();
+    for (final name in ['Gregory Drive Diner', "Don's Chophouse"]) {
+      await tester.tap(find.text(name));
+      await tester.pumpAndSettle();
+    }
+
+    final scrollable = find.byType(Scrollable).last;
+    final position = tester.state<ScrollableState>(scrollable).position;
+    final extents = <double>{};
+    while (position.pixels < position.maxScrollExtent) {
+      extents.add(position.maxScrollExtent);
+      await tester.drag(scrollable, const Offset(0, -150));
+      await tester.pumpAndSettle();
+    }
+    expect(extents, hasLength(1), reason: 'maxScrollExtent changed while scrolling: $extents');
   });
 
   testWidgets('hours sheet stays clear of the Dynamic Island and can be closed', (tester) async {
@@ -251,4 +254,34 @@ void main() {
     expect(Theme.of(tester.element(find.text('Ikenberry Dining Center'))).brightness,
         Brightness.light);
   });
+}
+
+/// Pumps the app against real feed responses captured on 2026-10-22, at
+/// 12:10 PM campus time.
+Future<void> _pumpWithLiveCapture(WidgetTester tester) async {
+  final api = IllinoisDiningApi(client: MockClient((request) async {
+    final name = switch (request.url.path) {
+      '/MobileAppWS/api/LocationSchedules' => 'location_schedules.json',
+      '/MobileAppWS/api/Menu/1/10-22-2026' => 'menu_1_2026-10-22.json',
+      '/MobileAppWS/api/Menu/5/10-22-2026' => 'menu_5_2026-10-22.json',
+      _ => null,
+    };
+    return name == null
+        ? http.Response('[]', 200)
+        : http.Response.bytes(File('test/fixtures/$name').readAsBytesSync(), 200);
+  }));
+  final now = DateTime(2026, 10, 22, 12, 10);
+  await tester.binding.setSurfaceSize(const Size(393, 852));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(IlliniDiningApp(
+    repository: DiningRepository(
+      diningApi: api,
+      balanceApi: DemoDiningApi(latency: Duration.zero),
+      cache: MemoryCache(),
+      now: () => now,
+    ),
+    preferences: await SharedPreferences.getInstance(),
+    clock: Clock(() => now),
+  ));
+  await tester.pumpAndSettle();
 }

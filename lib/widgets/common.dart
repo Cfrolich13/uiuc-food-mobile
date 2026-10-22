@@ -158,3 +158,33 @@ class FavoriteButton extends StatelessWidget {
     );
   }
 }
+
+/// A vertical list that lays out all of its children up front.
+///
+/// [ListView] only measures the children near the screen and estimates the
+/// rest, which is fine for uniform rows but makes the scrollbar jump in size
+/// and position when children vary a lot in height (a collapsed station vs
+/// an expanded one). Menus and the location list are small enough to lay out
+/// in full, which gives an exact scroll extent and a steady scrollbar.
+class ExactScrollList extends StatelessWidget {
+  const ExactScrollList({
+    super.key,
+    this.controller,
+    this.padding,
+    this.physics = const AlwaysScrollableScrollPhysics(),
+    required this.children,
+  });
+
+  final ScrollController? controller;
+  final EdgeInsetsGeometry? padding;
+  final ScrollPhysics physics;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+        controller: controller,
+        physics: physics,
+        padding: padding,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+      );
+}

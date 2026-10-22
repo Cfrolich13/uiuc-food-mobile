@@ -84,7 +84,7 @@ class _HallsScreenState extends State<HallsScreen> {
           message: 'Tap the star on any dining hall to pin it here and at the top of the list.',
         ));
       }
-      return ListView(
+      return ExactScrollList(
         controller: _scroll,
         padding: const EdgeInsets.all(16),
         children: [
@@ -98,7 +98,7 @@ class _HallsScreenState extends State<HallsScreen> {
     final diningHalls = others.where((h) => h.type == VenueType.diningHall).toList();
     final cafes = others.where((h) => h.type == VenueType.cafe).toList();
 
-    return ListView(
+    return ExactScrollList(
       controller: _scroll,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
