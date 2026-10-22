@@ -152,9 +152,18 @@ page students see in a browser:
 [MyHousing → Meal Plan Balances](https://web.housing.illinois.edu/MyHousing/MealPlanBalances).
 
 - **Sign-in:** *Sign in with NetID* opens that page in a WebView. The University redirects to its
-  normal sign-in (`shibboleth.illinois.edu`, then Duo), and the student signs in there. The
-  password goes to the University; the app never sees it, and the WebView can only visit
-  `illinois.edu` and Duo addresses.
+  normal sign-in, now primarily Microsoft (`login.microsoftonline.com`, `login.microsoft.com`),
+  with `shibboleth.illinois.edu` and Duo still involved for some sign-ins. The student signs in
+  there; the password goes to the University, and the app never sees it. The top-level page can
+  only be an `illinois.edu`, Microsoft sign-in or Duo address (frames inside those pages aren't
+  restricted).
+- **Passkeys:** passkey sign-in for Microsoft doesn't work inside the app. iOS and Android only
+  allow passkeys in an app's embedded WebView for the app's *own* website, so a passkey for
+  Microsoft has to be used in a real browser or a system sign-in sheet, which the app can't read
+  from. Accounts with another sign-in method (Microsoft Authenticator, Duo) can use
+  *Other ways to sign in*. See
+  [passkeys.dev: iOS](https://passkeys.dev/docs/reference/ios/#webviews) and
+  [Android](https://passkeys.dev/docs/reference/android/#webviews).
 - **Reading:** once the Housing page loads, the app reads its visible text and parses the
   *Meal Plan*, *Meals Remaining*, *Dining Dollars* and *Illini Cash* tiles
   (`HousingBalanceApi.parseBalancesPage`). That's the only script the app runs, and only on that

@@ -7,13 +7,25 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'dining_api.dart';
 import 'housing_balance_api.dart';
 
-/// Hosts the University sign-in flow may visit: University sites (including
-/// shibboleth.illinois.edu) and Duo two-factor. Anything else is blocked.
+/// Hosts the University sign-in flow may show as the page: University sites
+/// (including shibboleth.illinois.edu), Microsoft (the University's primary
+/// sign-in) and Duo two-factor, which some sign-ins still use.
 bool isUniversitySignInHost(String host) =>
     host == 'illinois.edu' ||
     host.endsWith('.illinois.edu') ||
+    _microsoftSignInHosts.contains(host) ||
     host.endsWith('.duosecurity.com') ||
     host.endsWith('.duo.com');
+
+const _microsoftSignInHosts = {'login.microsoftonline.com', 'login.microsoft.com'};
+
+/// Lets the sign-in flow move between University, Microsoft and Duo pages,
+/// and blocks the page from leaving them. Frames inside a page (which
+/// Microsoft and Duo use) aren't restricted.
+NavigationDecision decideSignInNavigation(NavigationRequest request) =>
+    !request.isMainFrame || isUniversitySignInHost(Uri.tryParse(request.url)?.host ?? '')
+        ? NavigationDecision.navigate
+        : NavigationDecision.prevent;
 
 /// Reads the visible text of the page in [controller].
 ///
@@ -74,10 +86,7 @@ class WebViewBalancePageSource implements BalancePageSource {
     }
 
     await controller.setNavigationDelegate(NavigationDelegate(
-      onNavigationRequest: (request) =>
-          isUniversitySignInHost(Uri.tryParse(request.url)?.host ?? '')
-              ? NavigationDecision.navigate
-              : NavigationDecision.prevent,
+      onNavigationRequest: decideSignInNavigation,
       onPageFinished: (url) async {
         final uri = Uri.tryParse(url);
         if (uri == null) return;

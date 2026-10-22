@@ -7,6 +7,7 @@ import 'package:illini_dining/data/housing_balance_api.dart';
 import 'package:illini_dining/data/housing_webview.dart';
 import 'package:illini_dining/data/local_cache.dart';
 import 'package:illini_dining/data/demo_dining_api.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 /// Roughly what a browser's `innerText` gives for the saved page: each block
 /// of text on its own line.
@@ -110,9 +111,22 @@ Dining Dollars
       expect(HousingBalanceApi.isBalancesPage(
           Uri.parse('https://shibboleth.illinois.edu/idp/profile/SAML2/Redirect/SSO')), isFalse);
       expect(isUniversitySignInHost('shibboleth.illinois.edu'), isTrue);
+      expect(isUniversitySignInHost('login.microsoftonline.com'), isTrue);
+      expect(isUniversitySignInHost('login.microsoft.com'), isTrue);
       expect(isUniversitySignInHost('api-1234abcd.duosecurity.com'), isTrue);
       expect(isUniversitySignInHost('evil-illinois.edu.example.com'), isFalse);
+      expect(isUniversitySignInHost('login.microsoftonline.com.example.com'), isFalse);
+      expect(isUniversitySignInHost('microsoft.com'), isFalse);
       expect(isUniversitySignInHost('example.com'), isFalse);
+    });
+
+    test('only the top-level page is restricted, not frames inside it', () {
+      NavigationDecision decide(String url, {bool mainFrame = true}) =>
+          decideSignInNavigation(NavigationRequest(url: url, isMainFrame: mainFrame));
+      expect(decide('https://login.microsoftonline.com/common/oauth2/authorize'),
+          NavigationDecision.navigate);
+      expect(decide('https://example.com/'), NavigationDecision.prevent);
+      expect(decide('https://example.com/frame', mainFrame: false), NavigationDecision.navigate);
     });
   });
 }

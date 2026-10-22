@@ -30,10 +30,7 @@ class _HousingSignInScreenState extends State<HousingSignInScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(NavigationDelegate(
-        onNavigationRequest: (request) =>
-            isUniversitySignInHost(Uri.tryParse(request.url)?.host ?? '')
-                ? NavigationDecision.navigate
-                : NavigationDecision.prevent,
+        onNavigationRequest: decideSignInNavigation,
         onUrlChange: (change) {
           final host = Uri.tryParse(change.url ?? '')?.host;
           if (host != null && host.isNotEmpty && mounted) setState(() => _host = host);
