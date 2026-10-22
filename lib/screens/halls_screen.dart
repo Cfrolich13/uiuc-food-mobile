@@ -113,7 +113,7 @@ class _HallsScreenState extends State<HallsScreen> {
           for (final hall in diningHalls) _HallCard(hall: hall),
         ],
         if (cafes.isNotEmpty) ...[
-          const _SectionHeader('Cafés & Late Night'),
+          const _SectionHeader('Cafés & More'),
           for (final hall in cafes) _HallCard(hall: hall),
         ],
       ],

@@ -1,3 +1,5 @@
+import 'campus_time.dart';
+
 /// The kind of venue, used for grouping and iconography.
 enum VenueType {
   diningHall,
@@ -126,24 +128,31 @@ class DiningHall {
   final double? longitude;
   final String? description;
 
-  /// Service windows that apply on [day], ordered by opening time.
+  /// Service windows that apply on campus date [day], ordered by opening time.
+  /// Times are campus wall-clock minutes (see [CampusTime]).
   List<ServiceHours> hoursOn(DateTime day) {
     final sessions = this.sessions;
     final List<ServiceHours> result;
     if (sessions != null) {
       result = [
         for (final s in sessions)
-          if (_sameDay(s.start.toLocal(), day)) _sessionHours(s, day),
+          if (_sameDay(CampusTime.from(s.start), day)) _sessionHours(s, day),
       ];
     } else {
       result = hours.where((h) => h.appliesOn(day)).toList();
     }
-    return result..sort((a, b) => a.opensAt.compareTo(b.opensAt));
+    // Break ties by closing time so the main meal (e.g. Lunch) comes before a
+    // longer-running specialty period that opens at the same time.
+    return result
+      ..sort((a, b) {
+        final byOpen = a.opensAt.compareTo(b.opensAt);
+        return byOpen != 0 ? byOpen : a.closesAt.compareTo(b.closesAt);
+      });
   }
 
   static ServiceHours _sessionHours(ServiceSession s, DateTime day) {
-    final start = s.start.toLocal();
-    final end = s.end.toLocal();
+    final start = CampusTime.from(s.start);
+    final end = CampusTime.from(s.end);
     return ServiceHours(
       meal: s.meal,
       weekdays: {day.weekday},
@@ -157,12 +166,21 @@ class DiningHall {
       a.year == b.year && a.month == b.month && a.day == b.day;
 
   OpenStatus statusAt(DateTime now) {
-    for (final h in hoursOn(now)) {
+    final today = hoursOn(now);
+    for (final h in today) {
       if (h.isOpenAt(now)) {
-        // Extend through back-to-back windows (e.g. lunch → light lunch).
+        // Stay open through overlapping or back-to-back windows
+        // (e.g. lunch → light lunch, or lunch alongside Field of Greens).
         var closes = h.closesAt;
-        for (final next in hoursOn(now)) {
-          if (next.opensAt == closes) closes = next.closesAt;
+        var extended = true;
+        while (extended) {
+          extended = false;
+          for (final other in today) {
+            if (other.opensAt <= closes && other.closesAt > closes) {
+              closes = other.closesAt;
+              extended = true;
+            }
+          }
         }
         return OpenStatus(
           isOpen: true,

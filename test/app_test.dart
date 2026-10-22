@@ -45,7 +45,7 @@ void main() {
     expect(find.text('Dining Halls'), findsOneWidget);
     expect(find.text('Ikenberry Dining Center'), findsOneWidget);
     // intl separates the time and AM/PM with a narrow no-break space.
-    expect(find.text('Open · Lunch until 2:00\u202fPM'), findsWidgets);
+    expect(find.text('Open until 2:00\u202fPM · Lunch'), findsWidgets);
     expect(find.text('Closed · Late Night at 8:00\u202fPM'), findsOneWidget);
   });
 

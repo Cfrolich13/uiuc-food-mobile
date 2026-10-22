@@ -20,12 +20,11 @@ Future<void> main() async {
   final cache = FileCache(Directory('${supportDir.path}/dining_cache'));
 
   final demoApi = DemoDiningApi();
-  final customApi = AppConfig.apiBaseUrl.isEmpty
-      ? null
-      : HttpDiningApi(baseUrl: AppConfig.apiBaseUrl, authToken: AppConfig.apiToken);
-  final illinoisApi = AppConfig.illinoisDiningUrl.isEmpty
-      ? null
-      : IllinoisDiningApi(baseUrl: AppConfig.illinoisDiningUrl);
+  final customApi = AppConfig.useCustomBackend
+      ? HttpDiningApi(baseUrl: AppConfig.apiBaseUrl, authToken: AppConfig.apiToken)
+      : null;
+  final illinoisApi =
+      AppConfig.useIllinoisFeed ? IllinoisDiningApi(baseUrl: AppConfig.illinoisDiningUrl) : null;
 
   final repository = DiningRepository(
     diningApi: illinoisApi ?? customApi ?? demoApi,

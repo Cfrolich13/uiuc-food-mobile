@@ -1,10 +1,11 @@
 import 'package:intl/intl.dart';
 
+import '../models/campus_time.dart';
 import '../models/dining_hall.dart';
 
-/// Supplies the current time; swapped out in tests.
+/// Supplies the current campus time (see [CampusTime]); swapped out in tests.
 class Clock {
-  const Clock([this._now = DateTime.now]);
+  const Clock([this._now = CampusTime.now]);
 
   final DateTime Function() _now;
 
@@ -39,18 +40,23 @@ String formatSavedAt(DateTime savedAt, DateTime now) {
   return '${DateFormat('MMM d').format(savedAt)} at ${formatTime(savedAt)}';
 }
 
-/// One-line open/closed summary, e.g. "Open · Lunch until 2:00 PM".
+/// One-line open/closed summary, e.g. "Open until 3:00 PM · Lunch".
 String describeStatus(OpenStatus status, DateTime now) {
   final next = status.nextChange;
   if (status.isOpen) {
     final until = next == null ? '' : ' until ${_timeOrMidnight(next)}';
-    return 'Open · ${status.currentMeal}$until';
+    final meal = _meaningfulMeal(status.currentMeal);
+    return 'Open$until${meal == null ? '' : ' · $meal'}';
   }
   if (next == null) return 'Closed';
   final sameDay = next.year == now.year && next.month == now.month && next.day == now.day;
   final when = sameDay ? formatTime(next) : '${formatDay(next, now)} ${formatTime(next)}';
-  return 'Closed · ${status.nextMeal} at $when';
+  final meal = _meaningfulMeal(status.nextMeal);
+  return meal == null ? 'Closed · Opens $when' : 'Closed · $meal at $when';
 }
+
+/// Cafés publish a single all-day "Daily Menu" period, which isn't worth naming.
+String? _meaningfulMeal(String? meal) => meal == 'Daily Menu' ? null : meal;
 
 String _timeOrMidnight(DateTime t) =>
     t.hour == 0 && t.minute == 0 ? 'midnight' : formatTime(t);

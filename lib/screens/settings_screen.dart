@@ -150,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.info_outline_rounded),
             title: const Text('Illini Dining'),
             subtitle: Text([
-              if (AppConfig.illinoisDiningUrl.isNotEmpty)
+              if (AppConfig.useIllinoisFeed)
                 'Menus and hours from University Housing.'
               else if (AppConfig.useSampleMenus)
                 'Using sample menus.',

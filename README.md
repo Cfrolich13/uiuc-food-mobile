@@ -5,8 +5,8 @@ dining section of the Illinois app and gives it a dedicated home: see what every
 serving, pin your favorites, check your meal plan balances, and keep reading menus when the Wi-Fi
 in the basement of your residence hall gives out.
 
-> Not an official University of Illinois app. Out of the box it runs on built-in sample data; see
-> [Connecting real data](#connecting-real-data).
+> Not an official University of Illinois app. Menus and hours come live from University Housing's
+> public feed (see [Data sources](#data-sources)); meal plan balances are sample data.
 
 | Dining list | Menu (dark) | Offline | Balances (dark) |
 | --- | --- | --- | --- |
@@ -14,12 +14,15 @@ in the basement of your residence hall gives out.
 
 ## Features
 
-- **What's being served:** every dining hall and café, with live open/closed status ("Open ·
-  Lunch until 2:00 PM", "Closed · Dinner at 4:30 PM"). Each hall's menu is split by meal and
-  station, with calories and dietary badges. Menus open on the meal being served right now, and
-  you can browse the next 7 days.
-- **Dietary filters:** Vegan, Vegetarian, Gluten-free and Halal filters, kept between launches.
-  Allergen badges (nuts, dairy) are shown on each item.
+- **What's being served:** all 14 University Housing dining halls, cafés and markets, with live
+  open/closed status ("Open until 3:00 PM · Lunch", "Closed · Dinner at 4:30 PM"). Each menu is
+  split by meal (including Light Lunch, Kosher and Field of Greens), station and course. Menus
+  open on the meal being served right now, and you can browse the next 7 days.
+- **Dietary filters:** Vegan, Vegetarian, Halal, Kosher and Jain filters, kept between launches.
+  Only diets that appear on the current menu are offered. Every item lists what it contains
+  (gluten, milk, eggs, soy, nuts…).
+- **Campus time:** hours and dates are always shown in Champaign time, whatever time zone the
+  phone is set to.
 - **Favorites:** star any location to pin it to the top of the list and to the Favorites tab.
   Favorites are stored on the device.
 - **Offline menus:** every screen first shows what's saved on the device, then refreshes from the
@@ -36,9 +39,11 @@ in the basement of your residence hall gives out.
 
 ```sh
 flutter pub get
-flutter run            # sample data
-flutter test           # unit + widget tests
+flutter run                                     # live University Housing data
+flutter run --dart-define=USE_SAMPLE_DATA=true  # built-in sample data, works with no network
+flutter test                                    # unit + widget tests (no network needed)
 flutter analyze
+dart run tool/live_feed_check.dart              # checks the live feed still parses
 ```
 
 ### iOS builds (CI)
@@ -46,13 +51,14 @@ flutter analyze
 `.github/workflows/ios-build.yml` builds an **unsigned** `.ipa` on every push. It runs analyze and
 tests first, then uploads the `.ipa` as a workflow artifact, kept for 30 days. The download is
 the `.ipa` itself, not a zip. To run it by hand,
-go to **Actions → iOS build → Run workflow**. You can optionally give a `DINING_API_BASE_URL` to
-build against a real backend. Sign the `.ipa` yourself before installing it, for example with
+go to **Actions → iOS build → Run workflow**. Builds use the live feed by default; the optional
+inputs override its URL or add a custom backend. Sign the `.ipa` yourself before installing it, for example with
 Sideloadly, AltStore or `codesign`.
 
-To try the offline experience on sample data, open **Settings → Simulate no internet**, then open
-a hall. Today's menu still loads from the device. Days that were never downloaded explain why
-they aren't available.
+To try the offline experience, open a few menus, turn on airplane mode, and reopen the app. Saved
+menus still load, with a banner saying when they were saved. Days that were never downloaded
+explain why they aren't available. Sample-data builds also have **Settings → Simulate no
+internet**.
 
 ## Architecture
 
@@ -81,33 +87,46 @@ lib/
 The UI treats that last case as "offline". Cache writes go to a temp file and are then renamed into
 place, so a crash can't leave a half-written menu behind.
 
-## Connecting real data
+## Data sources
 
 ### University Housing menus (no sign-in)
 
 The official Illinois app ([rokwire/illinois-app](https://github.com/rokwire/illinois-app)) loads
-dining locations, hours and menus from a University Housing feed, without signing in.
-`IllinoisDiningApi` reads that same feed:
+dining locations, hours and menus from a public University Housing feed. `IllinoisDiningApi` reads
+that same feed at `https://web.housing.illinois.edu/MobileAppWS/api`:
 
 | Endpoint | Response |
 | --- | --- |
-| `GET {base}/LocationSchedules` | `{"DiningOptions": [{DiningOptionID, DiningOptionName, Type, Address, Lat, Long, DiningSchedules: [{TimePeriod, StartTimeUTC, EndTimeUTC, …}]}]}` |
-| `GET {base}/Menu/{DiningOptionID}/{M-d-yyyy}` | `[{ItemID, FormalName, Meal, Course, CourseSort, Traits, …}]` |
+| `GET /LocationSchedules` | `{"DiningOptions": [{DiningOptionID, DiningOptionName, Type, Address, Lat, Long, MoreInfo, DiningSchedules: [{TimePeriod, StartTimeUTC, EndTimeUTC, …}]}]}`, with about two weeks of schedules |
+| `GET /Menu/{DiningOptionID}/{M-d-yyyy}` | `[{ItemID, FormalName, Meal, ServingUnit, Course, CourseSort, Traits, …}]` |
 
-The field names come from the official app's parsers (`lib/model/Dining.dart`). The official app
-doesn't hard-code the base URL; it receives it at runtime as `illini_cash_base_url` from its remote
-config. Pass that URL in:
+The official app doesn't hard-code this URL; it receives it from its remote config. It was found
+by following the public [Dining Menus](https://web.housing.illinois.edu/diningmenus) site, which
+serves the same data. The responses were then checked against the official app's parsers
+(`lib/model/Dining.dart`). `test/fixtures/` holds real responses captured on 2026-10-22, and
+`tool/live_feed_check.dart` checks the live feed.
 
-```sh
-flutter run --dart-define=ILLINOIS_DINING_URL=https://…
-```
+How the feed maps to the app:
 
-For CI builds, set it as the `ILLINOIS_DINING_URL` repository variable (Settings → Secrets and
-variables → Actions → Variables) or enter it when running the workflow manually.
+- **Stations:** `ServingUnit` is the station (Gregory Drive Diner, Kosher Kitchen…). `Course`
+  (Entrees, Starches…) becomes a subheading.
+- **Hours:** schedule times are UTC seconds and are shown in campus time.
+- **Traits:** the feed mixes diet types (Vegan, Vegetarian, Halal, Kosher, Jain) with
+  ingredients an item contains (Gluten, Milk, Eggs, Peanuts…). Diet types become filters and
+  badges; ingredients are listed in full under each item. The app never infers "gluten-free"
+  from an ingredient being absent.
+- **Nutrition:** the feed also has `/Nutrition/{ItemID}`, which the app doesn't use yet.
 
-`Traits` mixes diet types (Vegan, Vegetarian, Halal, Kosher) with ingredients an item contains
-(Gluten, Milk, Peanuts…). The app shows diet types as filters and ingredients as allergen badges.
-It never infers "gluten-free" from an ingredient being absent.
+The app is light on the feed. It makes one request for the location list, plus one per menu: the
+menus you open, and today's and tomorrow's menus fetched in batches of four. Requests carry a
+`User-Agent` naming this project.
+
+The server's certificate chains to *emSign Root CA - G1*, which current iOS and Android trust.
+Some older Linux certificate stores lack it; `tool/live_feed_check.dart --ca-file=…` covers that
+case for local checks.
+
+To point the app at a different feed URL, use `--dart-define=ILLINOIS_DINING_URL=…`. For CI, set
+the `ILLINOIS_DINING_URL` repository variable or the workflow input.
 
 ### Meal plan balances
 
@@ -135,10 +154,12 @@ flutter run \
 The JSON shapes are the `toJson()` methods in `lib/models/`. For example, a menu item is
 `{"name": "Chana Masala", "tags": ["vegan", "glutenFree"], "calories": 310}`. Hours are
 `{"meal": "Lunch", "weekdays": [1,2,3,4,5], "opens": "10:30", "closes": "14:00"}`, with ISO
-weekdays (Monday = 1). When both are set, `ILLINOIS_DINING_URL` supplies menus and the custom
-backend supplies balances.
+weekdays (Monday = 1). By default the University feed still supplies menus and the custom
+backend supplies balances. To take menus from the backend too, also pass
+`--dart-define=ILLINOIS_DINING_URL=` (empty).
 
 ### Sample data
 
-With nothing configured, the app uses built-in sample data. Venue names and addresses reflect
-University Housing dining; hours, menus and balances are illustrative only.
+`--dart-define=USE_SAMPLE_DATA=true` switches to built-in sample data, which works with no
+network. Venue names and addresses reflect University Housing dining; hours, menus and balances
+are illustrative only.

@@ -5,6 +5,7 @@ enum DietaryTag {
   glutenFree('Gluten-free', 'GF'),
   halal('Halal', 'H'),
   kosher('Kosher', 'K'),
+  jain('Jain', 'J'),
   containsNuts('Contains nuts', 'N'),
   containsDairy('Contains dairy', 'D'),
   containsGluten('Contains gluten', 'G');
@@ -15,7 +16,7 @@ enum DietaryTag {
   final String abbreviation;
 
   /// Tags a user can filter *for* (the rest are allergen warnings).
-  static const preferences = [vegan, vegetarian, glutenFree, halal, kosher];
+  static const preferences = [vegan, vegetarian, glutenFree, halal, kosher, jain];
 
   static DietaryTag? fromJson(String value) {
     for (final tag in values) {
@@ -26,11 +27,24 @@ enum DietaryTag {
 }
 
 class MenuItem {
-  const MenuItem({required this.name, this.tags = const {}, this.calories});
+  const MenuItem({
+    required this.name,
+    this.tags = const {},
+    this.calories,
+    this.course,
+    this.contains = const [],
+  });
 
   final String name;
   final Set<DietaryTag> tags;
   final int? calories;
+
+  /// Subsection within a station, e.g. "Entrees" or "Desserts".
+  final String? course;
+
+  /// Ingredients the item contains as reported by the source, e.g.
+  /// ["Gluten", "Milk", "Soy"]. More complete than the allergen [tags].
+  final List<String> contains;
 
   factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
         name: json['name'] as String,
@@ -39,12 +53,16 @@ class MenuItem {
             .whereType<DietaryTag>()
             .toSet(),
         calories: json['calories'] as int?,
+        course: json['course'] as String?,
+        contains: ((json['contains'] ?? const []) as List).cast<String>(),
       );
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'tags': tags.map((t) => t.name).toList(),
         if (calories != null) 'calories': calories,
+        if (course != null) 'course': course,
+        if (contains.isNotEmpty) 'contains': contains,
       };
 }
 

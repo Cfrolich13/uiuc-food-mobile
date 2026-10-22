@@ -1,6 +1,7 @@
 import '../config.dart';
 import '../data/dining_repository.dart';
 import '../models/balance.dart';
+import '../models/campus_time.dart';
 import '../models/dining_hall.dart';
 import '../models/menu.dart';
 import 'loader.dart';
@@ -9,7 +10,7 @@ import 'user_prefs.dart';
 /// The list of dining locations. Also keeps upcoming menus saved for offline use.
 class HallsController extends Loader<List<DiningHall>> {
   HallsController(this.repository, this.prefs, {DateTime Function()? now})
-      : _now = now ?? DateTime.now;
+      : _now = now ?? CampusTime.now;
 
   final DiningRepository repository;
   final UserPrefs prefs;

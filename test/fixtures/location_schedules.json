@@ -1,0 +1,259 @@
+{
+ "DiningOptions": [
+  {
+   "DiningOptionID": 1,
+   "DiningOptionName": "Ikenberry Dining Center at Ikenberry Commons",
+   "Type": "Classic Dining Hall",
+   "DiningLocation": "Ikenberry Commons",
+   "Address": "301 E. Gregory Drive, Champaign",
+   "MoreInfo": "<p>Ikenberry Dining Center located on the first floor of the\nStudent Dining and Residential Programs Building (SDRP).</p><p>Use a Classic Meal, Dining Dollars, Illini \nCash, Apple or \nGoogle\nPay, or credit card.</p><p>Examples of what you might find at Ikenberry's All-You-Care-to-Eat Stations:</p><ul><li>Gregory Drive Diner - American Comfort Foot</li><li>Penne Lane - Pasta and Global Cuisine</li><li>Prairie Fire - Pizza</li><li>Don's Chophouse (lunch) - Grilled Meats, Chicken and Seafood</li><li>Don's Chophouse (dinner) - Made-to-Order Steaks, Burgers and Fish (upcharge)</li><li>Soytainly - Vegan menu</li><li>Inclusive Solutions Kitchen - Allergy- and Gluten-Friendly Menus</li><li>Euclid S. - Deli and Salad Bar</li><li>Baked Expectations - Desserts</li></ul>",
+   "ImageUrl": "https://web.housing.illinois.edu/MobileAppWS/api/GetImage/78",
+   "TNT_Greeting": "Give us your feedback",
+   "TNT_Number": "55745",
+   "TNT_LocationCode": "TXTIKE",
+   "TNT_RDNCode": "TXTRDN",
+   "PaymentTypes": [
+    "ClassicMeal",
+    "Dining Dollars",
+    "IlliniCash",
+    "CreditCard",
+    "GooglePay",
+    "ApplePay"
+   ],
+   "Serving": "IKE InclusiveSolutions Serving, zzIKE Hortensia's Serving, IKE Gregory Drive Serving, IKE Soytainly Serving, IKE Don's Chophouse Serving, IKE Baked Expectations Serving, IKE Prairie Fire Serving, IKE Penne Lane Serving, IKE Euclid Street Deli Serving,",
+   "Lat": 40.10393699999999,
+   "Long": -88.235277,
+   "OnLineOrder": {
+    "android": {
+     "deep_link": "",
+     "store_url": ""
+    },
+    "ios": {
+     "deep_link": "",
+     "store_url": ""
+    }
+   },
+   "DiningSchedules": [
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Breakfast",
+     "ScheduleID": 373,
+     "DiningOptionID": 1,
+     "StartTimeUTC": 1792670400,
+     "EndTimeUTC": 1792681200
+    },
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Lunch",
+     "ScheduleID": 155,
+     "DiningOptionID": 1,
+     "StartTimeUTC": 1792683000,
+     "EndTimeUTC": 1792693800
+    },
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Light Lunch",
+     "ScheduleID": 281,
+     "DiningOptionID": 1,
+     "StartTimeUTC": 1792693800,
+     "EndTimeUTC": 1792699200
+    },
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Dinner",
+     "ScheduleID": 42,
+     "DiningOptionID": 1,
+     "StartTimeUTC": 1792704600,
+     "EndTimeUTC": 1792717200
+    },
+    {
+     "EventDateUTC": 1792731600,
+     "TimePeriod": "Breakfast",
+     "ScheduleID": 373,
+     "DiningOptionID": 1,
+     "StartTimeUTC": 1792756800,
+     "EndTimeUTC": 1792767600
+    },
+    {
+     "EventDateUTC": 1792731600,
+     "TimePeriod": "Lunch",
+     "ScheduleID": 155,
+     "DiningOptionID": 1,
+     "StartTimeUTC": 1792769400,
+     "EndTimeUTC": 1792780200
+    },
+    {
+     "EventDateUTC": 1792731600,
+     "TimePeriod": "Light Lunch",
+     "ScheduleID": 281,
+     "DiningOptionID": 1,
+     "StartTimeUTC": 1792780200,
+     "EndTimeUTC": 1792785600
+    },
+    {
+     "EventDateUTC": 1792731600,
+     "TimePeriod": "Dinner",
+     "ScheduleID": 42,
+     "DiningOptionID": 1,
+     "StartTimeUTC": 1792791000,
+     "EndTimeUTC": 1792803600
+    }
+   ]
+  },
+  {
+   "DiningOptionID": 5,
+   "DiningOptionName": "Lincoln/Allen Dining Hall at Lincoln/Allen (LAR)",
+   "Type": "Classic Dining Hall",
+   "DiningLocation": "Lincoln/Allen (LAR)",
+   "Address": "1005 S. Lincoln Avenue, Urbana",
+   "MoreInfo": "<p>Located downstairs from either the Allen Hall or Lincoln Avenue Residence Halls entrance, the LAR Dining Hall offers an all-you-care-to-eat menu during lunch and dinner. <br></p><p>Use a Classic Meal, Dining Dollars, Illini Cash, Apple or \nGoogle\nPay, or credit card.</p>",
+   "ImageUrl": "https://web.housing.illinois.edu/MobileAppWS/api/GetImage/82",
+   "TNT_Greeting": "",
+   "TNT_Number": "",
+   "TNT_LocationCode": "",
+   "TNT_RDNCode": "",
+   "PaymentTypes": [
+    "ClassicMeal",
+    "Dining Dollars",
+    "IlliniCash",
+    "CreditCard",
+    "GooglePay",
+    "ApplePay"
+   ],
+   "Serving": "LAR Serving, LAR Field of Greens Serving, LAR Kosher Kitchen Serving, zzLAR Allen Serving,",
+   "Lat": 40.1041224,
+   "Long": -88.2203952,
+   "OnLineOrder": {
+    "android": {
+     "deep_link": "",
+     "store_url": ""
+    },
+    "ios": {
+     "deep_link": "",
+     "store_url": ""
+    }
+   },
+   "DiningSchedules": [
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Lunch",
+     "ScheduleID": 155,
+     "DiningOptionID": 5,
+     "StartTimeUTC": 1792683000,
+     "EndTimeUTC": 1792693800
+    },
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Kosher Lunch",
+     "ScheduleID": 365,
+     "DiningOptionID": 5,
+     "StartTimeUTC": 1792683900,
+     "EndTimeUTC": 1792693800
+    },
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Dinner",
+     "ScheduleID": 6,
+     "DiningOptionID": 5,
+     "StartTimeUTC": 1792704600,
+     "EndTimeUTC": 1792713600
+    },
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Kosher Dinner",
+     "ScheduleID": 264,
+     "DiningOptionID": 5,
+     "StartTimeUTC": 1792705500,
+     "EndTimeUTC": 1792710900
+    },
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Field of Greens",
+     "ScheduleID": 364,
+     "DiningOptionID": 5,
+     "StartTimeUTC": 1792683000,
+     "EndTimeUTC": 1792699200
+    },
+    {
+     "EventDateUTC": 1792731600,
+     "TimePeriod": "Lunch",
+     "ScheduleID": 155,
+     "DiningOptionID": 5,
+     "StartTimeUTC": 1792769400,
+     "EndTimeUTC": 1792780200
+    },
+    {
+     "EventDateUTC": 1792731600,
+     "TimePeriod": "Dinner",
+     "ScheduleID": 6,
+     "DiningOptionID": 5,
+     "StartTimeUTC": 1792791000,
+     "EndTimeUTC": 1792800000
+    },
+    {
+     "EventDateUTC": 1792731600,
+     "TimePeriod": "Field of Greens",
+     "ScheduleID": 364,
+     "DiningOptionID": 5,
+     "StartTimeUTC": 1792769400,
+     "EndTimeUTC": 1792785600
+    }
+   ]
+  },
+  {
+   "DiningOptionID": 9,
+   "DiningOptionName": "Caffeinator at Ikenberry Commons",
+   "Type": "A La Carte",
+   "DiningLocation": "Ikenberry Commons",
+   "Address": "301 E. Gregory Drive, Champaign",
+   "MoreInfo": "Now proudly serving Peet's coffee and espresso drinks! Caffeinator is located on the second floor of Ikenberry Commons. Use Dining Dollars, Illini Cash, Apple or Google Pay, or credit card.",
+   "ImageUrl": "https://web.housing.illinois.edu/MobileAppWS/api/GetImage/74",
+   "TNT_Greeting": "",
+   "TNT_Number": "",
+   "TNT_LocationCode": "",
+   "TNT_RDNCode": "",
+   "PaymentTypes": [
+    "Dining Dollars",
+    "IlliniCash",
+    "CreditCard",
+    "GooglePay",
+    "ApplePay"
+   ],
+   "Serving": "Caffeinator Serving,",
+   "Lat": 40.10393699999999,
+   "Long": -88.235277,
+   "OnLineOrder": {
+    "android": {
+     "deep_link": "",
+     "store_url": ""
+    },
+    "ios": {
+     "deep_link": "",
+     "store_url": ""
+    }
+   },
+   "DiningSchedules": [
+    {
+     "EventDateUTC": 1792645200,
+     "TimePeriod": "Daily Menu",
+     "ScheduleID": 227,
+     "DiningOptionID": 9,
+     "StartTimeUTC": 1792670400,
+     "EndTimeUTC": 1792728000
+    },
+    {
+     "EventDateUTC": 1792731600,
+     "TimePeriod": "Daily Menu",
+     "ScheduleID": 170,
+     "DiningOptionID": 9,
+     "StartTimeUTC": 1792756800,
+     "EndTimeUTC": 1792796400
+    }
+   ]
+  }
+ ],
+ "ApplicationInfo": {
+  "MinimumPurchaseAmount": 5,
+  "AmountErrorMessage": "$5 minimum purchase required."
+ }
+}

@@ -5,11 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       illinois_dining_url:
-        description: "Optional ILLINOIS_DINING_URL (University Housing feed). Overrides the ILLINOIS_DINING_URL repo variable."
+        description: "Optional ILLINOIS_DINING_URL override. Leave empty for the live University Housing feed."
         required: false
         default: ""
       api_base_url:
-        description: "Optional DINING_API_BASE_URL. Leave empty to build with sample data."
+        description: "Optional DINING_API_BASE_URL for a custom backend (adds real balances)."
         required: false
         default: ""
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../models/campus_time.dart';
 import '../models/dining_hall.dart';
 import '../models/menu.dart';
 import 'dining_api.dart';
@@ -11,22 +12,27 @@ import 'dining_api.dart';
 /// Illinois app uses for locations, hours and menus (no sign-in required).
 ///
 /// Endpoints, relative to [baseUrl]:
-/// - `GET /LocationSchedules` → `{"DiningOptions": [...]}`
+/// - `GET /LocationSchedules` → `{"DiningOptions": [...]}`, with about two
+///   weeks of dated meal periods per location
 /// - `GET /Menu/{DiningOptionID}/{M-d-yyyy}` → `[menu item, ...]`
 ///
-/// Field names follow the official app's parsers in rokwire/illinois-app
-/// (`lib/model/Dining.dart`, `lib/service/Dinings.dart`).
+/// Field names match the official app's parsers in rokwire/illinois-app
+/// (`lib/model/Dining.dart`) and the live responses.
 class IllinoisDiningApi implements DiningApi {
   IllinoisDiningApi({
-    required String baseUrl,
+    this.baseUrl = defaultBaseUrl,
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
-  })  : baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
-        _client = client ?? http.Client();
+  }) : _client = client ?? http.Client();
+
+  static const defaultBaseUrl = 'https://web.housing.illinois.edu/MobileAppWS/api';
 
   final String baseUrl;
   final Duration timeout;
   final http.Client _client;
+
+  /// Meal start times from the last [fetchHalls], used to order a day's meals.
+  final _sessionsByHall = <String, List<ServiceSession>>{};
 
   @override
   Future<List<DiningHall>> fetchHalls() async {
@@ -41,6 +47,9 @@ class IllinoisDiningApi implements DiningApi {
         if (hall != null) halls.add(hall);
       }
     }
+    _sessionsByHall
+      ..clear()
+      ..addEntries(halls.map((h) => MapEntry(h.id, h.sessions ?? const [])));
     return halls;
   }
 
@@ -49,18 +58,25 @@ class IllinoisDiningApi implements DiningApi {
     final date = '${day.month}-${day.day}-${day.year}';
     final json = await _get('/Menu/${Uri.encodeComponent(hallId)}/$date');
     if (json is! List) throw const DiningApiException('Unexpected response from Menu');
-    return parseMenu(hallId, day, json.whereType<Map<String, dynamic>>());
+    return parseMenu(
+      hallId,
+      day,
+      json.whereType<Map<String, dynamic>>(),
+      sessions: _sessionsByHall[hallId],
+    );
   }
 
   Future<Object?> _get(String path) async {
+    final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     try {
-      final response = await _client
-          .get(Uri.parse('$baseUrl$path'), headers: {'Accept': 'application/json'})
-          .timeout(timeout);
+      final response = await _client.get(Uri.parse('$base$path'), headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'IlliniDining/1.0 (Flutter; +https://github.com/Cfrolich13/uiuc-food-mobile)',
+      }).timeout(timeout);
       if (response.statusCode != 200) {
         throw DiningApiException('GET $path returned ${response.statusCode}');
       }
-      return jsonDecode(response.body);
+      return jsonDecode(utf8.decode(response.bodyBytes));
     } on DiningApiException {
       rethrow;
     } on TimeoutException {
@@ -78,8 +94,6 @@ class IllinoisDiningApi implements DiningApi {
     final name = _string(json['DiningOptionName']);
     if (id == null || name == null) return null;
 
-    final type = _string(json['Type']) ?? '';
-    final location = _string(json['DiningLocation']);
     final sessions = <ServiceSession>[];
     for (final s in (json['DiningSchedules'] as List?) ?? const []) {
       if (s is! Map) continue;
@@ -92,46 +106,78 @@ class IllinoisDiningApi implements DiningApi {
     }
     sessions.sort((a, b) => a.start.compareTo(b.start));
 
+    // Names look like "Ikenberry Dining Center at Ikenberry Commons".
+    final at = name.indexOf(' at ');
     return DiningHall(
       id: id,
       name: name,
-      shortName: name,
-      address: _string(json['Address']) ?? location ?? '',
-      type: type.toLowerCase().contains('hall') ? VenueType.diningHall : VenueType.cafe,
+      shortName: at > 0 ? name.substring(0, at) : name,
+      address: _string(json['Address']) ?? _string(json['DiningLocation']) ?? '',
+      type: (_string(json['Type']) ?? '').toLowerCase().contains('hall')
+          ? VenueType.diningHall
+          : VenueType.cafe,
       hours: const [],
       sessions: sessions,
       latitude: _double(json['Lat']),
       longitude: _double(json['Long']),
-      description: _string(json['MoreInfo']),
+      description: htmlToText(_string(json['MoreInfo'])),
     );
   }
 
   /// Groups a flat list of menu items into meals and stations.
-  static DailyMenu parseMenu(String hallId, DateTime day, Iterable<Map<String, dynamic>> items) {
-    // meal → station → items, keeping first-seen order and the lowest CourseSort.
-    final meals = <String, Map<String, List<MenuItem>>>{};
-    final stationSort = <String, int>{};
+  ///
+  /// Stations are the feed's serving units (e.g. "Gregory Drive Diner");
+  /// items within a station are ordered by course (Entrees, Starches…).
+  /// Meals are ordered by their start time in [sessions] when known.
+  static DailyMenu parseMenu(
+    String hallId,
+    DateTime day,
+    Iterable<Map<String, dynamic>> items, {
+    List<ServiceSession>? sessions,
+  }) {
+    final meals = <String, Map<String, List<_Row>>>{};
     final seen = <String>{};
+    var index = 0;
 
     for (final json in items) {
       final name = _string(json['FormalName']);
       if (name == null) continue;
       final meal = _string(json['Meal']) ?? 'Menu';
-      final station = _string(json['Course']) ?? _string(json['Category']) ?? 'Other';
-      final itemKey = '$meal|$station|${_string(json['ItemID']) ?? name}';
-      if (!seen.add(itemKey)) continue;
+      final course = _string(json['Course']);
+      final station = _string(json['ServingUnit']) ?? _string(json['Category']) ?? course ?? 'Menu';
+      final key = '$meal|$station|${_string(json['ItemID']) ?? name}';
+      if (!seen.add(key)) continue;
 
-      final sort = _int(json['CourseSort']);
-      final sortKey = '$meal|$station';
-      if (sort != null && sort < (stationSort[sortKey] ?? 1 << 30)) stationSort[sortKey] = sort;
-
-      meals
-          .putIfAbsent(meal, () => {})
-          .putIfAbsent(station, () => [])
-          .add(MenuItem(name: name, tags: parseTraits(_string(json['Traits']))));
+      final traits = parseTraitList(_string(json['Traits']));
+      meals.putIfAbsent(meal, () => {}).putIfAbsent(station, () => []).add(_Row(
+            index++,
+            _int(json['CourseSort']) ?? 1 << 20,
+            MenuItem(
+              name: name,
+              course: course,
+              tags: tagsForTraits(traits),
+              contains: traits.where((t) => !_dietTraits.contains(t.toLowerCase())).toList(),
+            ),
+          ));
     }
 
-    final mealNames = meals.keys.toList()..sort((a, b) => _mealRank(a).compareTo(_mealRank(b)));
+    final starts = <String, DateTime>{};
+    for (final s in sessions ?? const <ServiceSession>[]) {
+      final local = CampusTime.from(s.start);
+      if (local.year == day.year && local.month == day.month && local.day == day.day) {
+        starts.putIfAbsent(s.meal, () => s.start);
+      }
+    }
+    final mealNames = meals.keys.toList();
+    int compareMeals(String a, String b) {
+      final sa = starts[a], sb = starts[b];
+      if (sa != null && sb != null) return sa.compareTo(sb);
+      if (sa != null || sb != null) return sa != null ? -1 : 1;
+      return _mealRank(a).compareTo(_mealRank(b));
+    }
+
+    mealNames.sort(compareMeals);
+
     return DailyMenu(
       hallId: hallId,
       date: dateKey(day),
@@ -139,25 +185,39 @@ class IllinoisDiningApi implements DiningApi {
         for (final meal in mealNames)
           Meal(
             name: meal,
-            stations: (meals[meal]!.entries.toList()
-                  ..sort((a, b) => (stationSort['$meal|${a.key}'] ?? 1 << 30)
-                      .compareTo(stationSort['$meal|${b.key}'] ?? 1 << 30)))
-                .map((e) => Station(name: e.key, items: e.value))
-                .toList(),
+            stations: [
+              for (final entry in meals[meal]!.entries)
+                Station(
+                  name: entry.key,
+                  items: (entry.value..sort((a, b) {
+                        final bySort = a.sort.compareTo(b.sort);
+                        return bySort != 0 ? bySort : a.index.compareTo(b.index);
+                      }))
+                      .map((r) => r.item)
+                      .toList(),
+                ),
+            ],
           ),
       ],
     );
   }
 
-  /// Maps the feed's comma-separated `Traits` (e.g. "Vegan,Gluten,Soy") to tags.
-  ///
-  /// Traits mix diet types (Vegan, Halal…) with ingredients the item contains
-  /// (Gluten, Milk, Peanuts…). Absence of an ingredient is not treated as a
-  /// "free from" guarantee, so nothing here produces [DietaryTag.glutenFree].
-  static Set<DietaryTag> parseTraits(String? traits) {
+  /// Splits the feed's comma-separated `Traits`, e.g. "Corn,Gluten,Vegan,".
+  static List<String> parseTraitList(String? traits) => [
+        for (final t in (traits ?? '').split(','))
+          if (t.trim().isNotEmpty) t.trim(),
+      ];
+
+  static const _dietTraits = {'vegan', 'vegetarian', 'halal', 'kosher', 'jain'};
+
+  /// Maps traits to tags. Traits mix diet types (Vegan, Halal, Jain…) with
+  /// ingredients an item contains (Gluten, Milk, Peanuts…). Absence of an
+  /// ingredient is never treated as a "free from" guarantee, so nothing here
+  /// produces [DietaryTag.glutenFree].
+  static Set<DietaryTag> tagsForTraits(Iterable<String> traits) {
     final tags = <DietaryTag>{};
-    for (final raw in (traits ?? '').split(',')) {
-      switch (raw.trim().toLowerCase()) {
+    for (final raw in traits) {
+      switch (raw.toLowerCase()) {
         case 'vegan':
           tags.addAll({DietaryTag.vegan, DietaryTag.vegetarian});
         case 'vegetarian':
@@ -166,6 +226,8 @@ class IllinoisDiningApi implements DiningApi {
           tags.add(DietaryTag.halal);
         case 'kosher':
           tags.add(DietaryTag.kosher);
+        case 'jain':
+          tags.add(DietaryTag.jain);
         case 'peanuts' || 'tree nuts':
           tags.add(DietaryTag.containsNuts);
         case 'milk':
@@ -177,7 +239,30 @@ class IllinoisDiningApi implements DiningApi {
     return tags;
   }
 
-  static const _mealOrder = ['breakfast', 'brunch', 'lunch', 'light lunch', 'dinner', 'late night'];
+  /// Flattens the feed's HTML descriptions (`<p>`, `<li>`) to plain text.
+  static String? htmlToText(String? html) {
+    if (html == null) return null;
+    // Source line breaks are just wrapping; structure comes from the tags.
+    final text = html
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '\n• ')
+        .replaceAll(RegExp(r'</p>|<br\s*/?>|</ul>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<[^>]+>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&quot;', '"')
+        .replaceAll('&amp;', '&')
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .join('\n');
+    return text.isEmpty ? null : text;
+  }
+
+  static const _mealOrder = [
+    'continental breakfast', 'breakfast', 'brunch', 'lunch', 'light lunch',
+    'kosher lunch', 'dinner', 'kosher dinner', 'late night',
+  ];
 
   static int _mealRank(String meal) {
     final i = _mealOrder.indexOf(meal.toLowerCase());
@@ -199,4 +284,12 @@ class IllinoisDiningApi implements DiningApi {
     final seconds = _int(v);
     return seconds == null ? null : DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
   }
+}
+
+class _Row {
+  _Row(this.index, this.sort, this.item);
+
+  final int index;
+  final int sort;
+  final MenuItem item;
 }

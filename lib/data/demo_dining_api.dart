@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../models/balance.dart';
+import '../models/campus_time.dart';
 import '../models/dining_hall.dart';
 import '../models/menu.dart';
 import 'dining_api.dart';
@@ -298,7 +299,7 @@ class DemoDiningApi implements DiningApi, BalanceApi {
   DemoDiningApi({
     this.latency = const Duration(milliseconds: 450),
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+  }) : _now = now ?? CampusTime.now;
 
   final Duration latency;
   final DateTime Function() _now;

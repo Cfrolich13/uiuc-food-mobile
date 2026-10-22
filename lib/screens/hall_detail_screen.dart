@@ -315,32 +315,61 @@ class _StationCard extends StatelessWidget {
                         color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
               ),
             ),
-            for (final item in items)
-              ListTile(
-                dense: true,
-                title: Text(item.name, style: theme.textTheme.bodyLarge),
-                subtitle: item.tags.isEmpty
-                    ? null
-                    : Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            for (final tag in DietaryTag.values)
-                              if (item.tags.contains(tag)) DietaryBadge(tag),
-                          ],
-                        ),
-                      ),
-                trailing: item.calories == null
-                    ? null
-                    : Text('${item.calories} cal',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              ),
+            for (final (i, item) in items.indexed) ...[
+              // Subheading when the course changes, e.g. Entrees → Starches.
+              if (item.course != null && (i == 0 || items[i - 1].course != item.course) &&
+                  items.any((other) => other.course != item.course))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Text(item.course!.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant, letterSpacing: 0.8)),
+                ),
+              _MenuItemTile(item: item),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MenuItemTile extends StatelessWidget {
+  const _MenuItemTile({required this.item});
+
+  final MenuItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // The "Contains" line, when present, already lists allergens in full.
+    final badges = [
+      for (final tag in DietaryTag.values)
+        if (item.tags.contains(tag) &&
+            (item.contains.isEmpty || DietaryTag.preferences.contains(tag)))
+          DietaryBadge(tag),
+    ];
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return ListTile(
+      dense: true,
+      title: Text(item.name, style: theme.textTheme.bodyLarge),
+      subtitle: badges.isEmpty && item.contains.isEmpty
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (badges.isNotEmpty) Wrap(spacing: 4, runSpacing: 4, children: badges),
+                  if (item.contains.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(top: badges.isEmpty ? 0 : 4),
+                      child: Text('Contains: ${item.contains.join(', ')}', style: muted),
+                    ),
+                ],
+              ),
+            ),
+      trailing: item.calories == null ? null : Text('${item.calories} cal', style: muted),
     );
   }
 }
@@ -381,9 +410,8 @@ class _HallInfoSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Start the week on Monday.
-    final monday = today.subtract(Duration(days: today.weekday - 1));
-    final week = [for (var i = 0; i < 7; i++) monday.add(Duration(days: i))];
+    // The next seven days; schedules are published from today onward.
+    final week = [for (var i = 0; i < 7; i++) DateTime(today.year, today.month, today.day + i)];
 
     return SafeArea(
       child: SingleChildScrollView(
