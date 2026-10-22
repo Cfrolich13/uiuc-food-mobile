@@ -41,6 +41,14 @@ flutter test           # unit + widget tests
 flutter analyze
 ```
 
+### iOS builds (CI)
+
+`.github/workflows/ios-build.yml` builds an **unsigned** `.ipa` on every push. It runs analyze and
+tests first, then uploads the `.ipa` as a workflow artifact, kept for 30 days. To run it by hand,
+go to **Actions → iOS build → Run workflow**. You can optionally give a `DINING_API_BASE_URL` to
+build against a real backend. Sign the `.ipa` yourself before installing it, for example with
+Sideloadly, AltStore or `codesign`.
+
 To try the offline experience on sample data, open **Settings → Simulate no internet**, then open
 a hall. Today's menu still loads from the device. Days that were never downloaded explain why
 they aren't available.

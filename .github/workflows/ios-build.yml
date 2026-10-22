@@ -1,0 +1,73 @@
+name: iOS build
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "Optional DINING_API_BASE_URL. Leave empty to build with sample data."
+        required: false
+        default: ""
+
+# A newer push to the same branch supersedes an in-progress build.
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.7"
+
+jobs:
+  build-ios:
+    name: Build unsigned IPA
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build iOS app (no code signing)
+        env:
+          API_BASE_URL: ${{ inputs.api_base_url }}
+        run: |
+          args=(--release --no-codesign --build-number="$GITHUB_RUN_NUMBER")
+          if [ -n "$API_BASE_URL" ]; then
+            args+=(--dart-define=DINING_API_BASE_URL="$API_BASE_URL")
+          fi
+          flutter build ios "${args[@]}"
+
+      # An .ipa is a zip with the .app inside a top-level Payload/ folder.
+      - name: Package IPA
+        id: package
+        run: |
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          name="IlliniDining-${version}-${GITHUB_RUN_NUMBER}-unsigned"
+          mkdir -p build/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/
+          (cd build/ipa && zip -qry "${name}.ipa" Payload)
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          ls -lh "build/ipa/${name}.ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: build/ipa/${{ steps.package.outputs.name }}.ipa
+          if-no-files-found: error
+          retention-days: 30
