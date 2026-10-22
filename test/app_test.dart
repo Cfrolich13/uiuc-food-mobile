@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -64,8 +65,12 @@ void main() {
     await tester.tap(find.byTooltip('Add Pennsylvania Avenue Dining Hall to favorites'));
     await tester.pumpAndSettle();
 
-    // A "Favorites" section header now appears above the other halls.
+    // A "Favorites" section header now appears above the other halls, and the
+    // hall is listed both there and in its usual section.
     expect(find.text('Favorites'), findsNWidgets(before + 1));
+    final mainList = find.byWidgetPredicate((w) => w is HallsScreen && !w.favoritesOnly);
+    expect(find.descendant(of: mainList, matching: find.text('Pennsylvania Avenue Dining Hall')),
+        findsNWidgets(2));
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getStringList('favorite_halls'), ['par']);
 
@@ -244,6 +249,18 @@ void main() {
     expect(find.textContaining('Offline'), findsNothing);
   });
 
+  testWidgets('nothing is cut off with an ellipsis', (tester) async {
+    await _pumpWithLiveCapture(tester);
+    _expectNoEllipsis(tester);
+
+    await tester.tap(find.text('Ikenberry Dining Center at Ikenberry Commons'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ikenberry Dining Center'), findsOneWidget, reason: 'title in full');
+    _expectNoEllipsis(tester);
+    // Collapsed previews name a few dishes and count the rest.
+    expect(find.textContaining(RegExp(r'^\d+ items · .+ and \d+ more$')), findsWidgets);
+  });
+
   testWidgets('hours sheet stays clear of the Dynamic Island and can be closed', (tester) async {
     // iPhone-style top inset for the status bar and Dynamic Island.
     tester.view.padding = FakeViewPadding(top: 59 * tester.view.devicePixelRatio);
@@ -327,3 +344,14 @@ Future<void> _pumpWithLiveCapture(WidgetTester tester) async {
   ));
   await tester.pumpAndSettle();
 }
+
+/// Fails if any visible text was cut short, with "…" or otherwise.
+void _expectNoEllipsis(WidgetTester tester) {
+  final truncated = <String>[
+    for (final element in find.byType(RichText).evaluate())
+      if ((element.renderObject! as RenderParagraph).didExceedMaxLines)
+        (element.widget as RichText).text.toPlainText(),
+  ];
+  expect(truncated, isEmpty, reason: 'texts that were cut off');
+}
+

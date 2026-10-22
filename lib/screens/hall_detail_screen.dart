@@ -53,7 +53,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(hall?.shortName ?? 'Menu'),
+        title: AppBarTitle(hall?.shortName ?? 'Menu'),
         actions: [
           if (hall != null)
             IconButton(
@@ -369,7 +369,11 @@ class _StationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final count = items.length == 1 ? '1 item' : '${items.length} items';
-    final preview = items.take(3).map((i) => i.name).join(', ');
+    // Names the first few dishes in full and says how many more there are,
+    // rather than trailing off.
+    final more = items.length - 3;
+    final preview = items.take(3).map((i) => i.name).join(', ') +
+        (more > 0 ? ' and $more more' : '');
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
@@ -390,8 +394,6 @@ class _StationCard extends StatelessWidget {
         ),
         subtitle: Text(
           '$count · $preview',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         children: [

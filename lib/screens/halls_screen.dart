@@ -95,9 +95,9 @@ class _HallsScreenState extends State<HallsScreen> {
       );
     }
 
-    final others = halls.where((h) => !prefs.isFavorite(h.id));
-    final diningHalls = others.where((h) => h.type == VenueType.diningHall).toList();
-    final cafes = others.where((h) => h.type == VenueType.cafe).toList();
+    // Favorites are pinned at the top and also stay in their usual section.
+    final diningHalls = halls.where((h) => h.type == VenueType.diningHall).toList();
+    final cafes = halls.where((h) => h.type == VenueType.cafe).toList();
 
     return ExactScrollList(
       controller: _scroll,
@@ -207,8 +207,6 @@ class _HallCard extends StatelessWidget {
                             child: Text(
                               // Non-breaking spaces keep each station name on one line.
                               stations.map((s) => s.replaceAll(' ', '\u00A0')).join(' · '),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall
                                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                             ),

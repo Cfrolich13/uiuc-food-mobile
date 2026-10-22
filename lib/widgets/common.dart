@@ -130,8 +130,7 @@ class StatusLabel extends StatelessWidget {
         Flexible(
           child: Text(text,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: color, fontWeight: isOpen ? FontWeight.w600 : null),
-              overflow: TextOverflow.ellipsis),
+                  color: color, fontWeight: isOpen ? FontWeight.w600 : null)),
         ),
       ],
     );
@@ -218,4 +217,46 @@ class ExactScrollList extends StatelessWidget {
         padding: padding,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
       );
+}
+
+/// An app bar title that's never cut off: it wraps onto a second line and
+/// steps its size down until it fits, instead of the app bar's default "…".
+class AppBarTitle extends StatelessWidget {
+  const AppBarTitle(this.text, {super.key});
+
+  final String text;
+
+  static const _sizes = [19.0, 17.0, 15.0, 13.0];
+
+  @override
+  Widget build(BuildContext context) {
+    final base = DefaultTextStyle.of(context).style;
+    return LayoutBuilder(builder: (context, constraints) {
+      final scaler = MediaQuery.textScalerOf(context);
+      var size = _sizes.last;
+      for (final candidate in _sizes) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: base.copyWith(fontSize: candidate)),
+          maxLines: 2,
+          textDirection: Directionality.of(context),
+          textScaler: scaler,
+        )..layout(maxWidth: constraints.maxWidth);
+        final fits = !painter.didExceedMaxLines;
+        painter.dispose();
+        if (fits) {
+          size = candidate;
+          break;
+        }
+      }
+      // Only the size is set, so the app bar's own color still applies; the
+      // explicit wrap and overflow override its single-line "…" default.
+      return Text(
+        text,
+        softWrap: true,
+        maxLines: null,
+        overflow: TextOverflow.visible,
+        style: TextStyle(fontSize: size),
+      );
+    });
+  }
 }
