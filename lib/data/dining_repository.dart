@@ -3,6 +3,7 @@ import '../models/campus_time.dart';
 import '../models/dining_hall.dart';
 import '../models/menu.dart';
 import 'dining_api.dart';
+import 'housing_balance_api.dart';
 import 'local_cache.dart';
 import 'network_status.dart';
 
@@ -124,6 +125,15 @@ class DiningRepository {
     return removed;
   }
 
+  /// Saves balances obtained outside [balance], e.g. from the sign-in screen.
+  Future<DateTime> saveBalance(MealPlanBalance balance) async {
+    final now = _now();
+    await cache.write(_balanceKey, balance.toJson(), savedAt: now);
+    return now;
+  }
+
+  Future<void> clearBalance() => cache.remove(_balanceKey);
+
   /// The saved menu for [hallId] on [day], without touching the network.
   Future<DailyMenu?> savedMenu(String hallId, DateTime day) async {
     final entry = await cache.read(menuKey(hallId, day));
@@ -166,7 +176,8 @@ class DiningRepository {
       fresh = await fetch();
     } catch (e) {
       yield Loaded(data: cached, savedAt: cachedAt, error: e);
-      network.reportFailure();
+      // Needing to sign in says nothing about whether we're online.
+      if (e is! SignInRequired) network.reportFailure();
       return;
     }
     final now = _now();

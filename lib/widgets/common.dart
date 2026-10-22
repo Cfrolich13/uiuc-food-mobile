@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/dining_repository.dart';
+import '../data/housing_balance_api.dart';
 import '../models/menu.dart';
 import '../theme/app_theme.dart';
 import 'formatting.dart';
@@ -52,9 +53,12 @@ class _SyncNoteState extends State<SyncNote> {
     final color = theme.colorScheme.onSurfaceVariant;
     final now = context.read<Clock>().now();
     final when = savedAt == null ? null : formatSavedAt(savedAt, now);
-    final (icon, text) = state.isOffline
-        ? (Icons.cloud_off_rounded, 'Offline · ${widget.what}${when == null ? '' : ' saved $when'}')
-        : (Icons.cloud_done_outlined, 'Updated $when');
+    final saved = when == null ? '' : ' saved $when';
+    final (icon, text) = state.error is SignInRequired
+        ? (Icons.lock_clock_outlined, 'Sign-in expired · ${widget.what}$saved')
+        : state.isOffline
+            ? (Icons.cloud_off_rounded, 'Offline · ${widget.what}$saved')
+            : (Icons.cloud_done_outlined, 'Updated $when');
     return Semantics(
       liveRegion: true,
       child: Row(

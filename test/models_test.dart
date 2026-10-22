@@ -101,8 +101,8 @@ void main() {
     test('balances stay within plan totals', () {
       for (final date in [DateTime(2026, 1, 1), thu(0), DateTime(2026, 12, 31)]) {
         final b = demoBalanceFor(date);
-        expect(b.mealSwipesRemaining, inInclusiveRange(0, b.mealSwipesTotal));
-        expect(b.diningDollars, inInclusiveRange(0, b.diningDollarsTotal));
+        expect(b.mealSwipesRemaining, inInclusiveRange(0, b.mealSwipesTotal!));
+        expect(b.diningDollars, inInclusiveRange(0, b.diningDollarsTotal!));
         expect(MealPlanBalance.fromJson(b.toJson()).toJson(), b.toJson());
       }
     });

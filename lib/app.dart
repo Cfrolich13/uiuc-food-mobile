@@ -19,6 +19,7 @@ class IlliniDiningApp extends StatelessWidget {
     this.demoApi,
     this.clock = const Clock(),
     this.connectivityChanges,
+    this.onBalanceSignIn,
   });
 
   final DiningRepository repository;
@@ -32,6 +33,9 @@ class IlliniDiningApp extends StatelessWidget {
   /// promptly after being offline.
   final Stream<Object?>? connectivityChanges;
 
+  /// Called after the student signs in to University Housing for balances.
+  final Future<void> Function()? onBalanceSignIn;
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -44,7 +48,9 @@ class IlliniDiningApp extends StatelessWidget {
           create: (context) =>
               HallsController(repository, context.read<UserPrefs>(), now: clock.now)..refresh(),
         ),
-        ChangeNotifierProvider(create: (_) => BalanceController(repository)..refresh()),
+        ChangeNotifierProvider(
+          create: (_) => BalanceController(repository, onSignedIn: onBalanceSignIn)..refresh(),
+        ),
         Provider<Reconnector>(
           lazy: false,
           // Reloading the location list is a single small request; once it

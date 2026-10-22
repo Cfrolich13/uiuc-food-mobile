@@ -10,6 +10,8 @@ import 'config.dart';
 import 'data/demo_dining_api.dart';
 import 'data/dining_api.dart';
 import 'data/dining_repository.dart';
+import 'data/housing_balance_api.dart';
+import 'data/housing_webview.dart';
 import 'data/illinois_dining_api.dart';
 import 'data/local_cache.dart';
 
@@ -27,9 +29,14 @@ Future<void> main() async {
   final illinoisApi =
       AppConfig.useIllinoisFeed ? IllinoisDiningApi(baseUrl: AppConfig.illinoisDiningUrl) : null;
 
+  // Balances come from the student's own University Housing page, read
+  // through a WebView that holds their NetID sign-in.
+  final housingSource =
+      AppConfig.useHousingBalances ? WebViewBalancePageSource(preferences) : null;
+
   final repository = DiningRepository(
     diningApi: illinoisApi ?? customApi ?? demoApi,
-    balanceApi: customApi ?? demoApi,
+    balanceApi: customApi ?? (housingSource == null ? demoApi : HousingBalanceApi(housingSource)),
     cache: cache,
   );
 
@@ -39,5 +46,6 @@ Future<void> main() async {
     // The "simulate offline" switch only makes sense with sample menus.
     demoApi: AppConfig.useSampleMenus ? demoApi : null,
     connectivityChanges: Connectivity().onConnectivityChanged,
+    onBalanceSignIn: housingSource?.markSignedIn,
   ));
 }

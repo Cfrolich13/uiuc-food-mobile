@@ -5,6 +5,9 @@
 /// - `DINING_API_BASE_URL` / `DINING_API_TOKEN`: a custom backend serving
 ///   this app's own JSON format, including balances (see README).
 /// - `USE_SAMPLE_DATA=true`: ignore the above and use built-in sample data.
+///
+/// Balances come from University Housing's website after the student signs
+/// in with their NetID, unless a custom backend or sample data is used.
 class AppConfig {
   static const useSampleData = bool.fromEnvironment('USE_SAMPLE_DATA');
   static const illinoisDiningUrl = String.fromEnvironment(
@@ -20,8 +23,10 @@ class AppConfig {
 
   static bool get useSampleMenus => !useIllinoisFeed && !useCustomBackend;
 
-  /// Real balances need a University sign-in, so only a custom backend has them.
-  static bool get useSampleBalances => !useCustomBackend;
+  static bool get useSampleBalances => useSampleData;
+
+  /// Balances read from University Housing's site after a NetID sign-in.
+  static bool get useHousingBalances => !useSampleData && !useCustomBackend;
 
   /// How many days ahead (including today) to keep menus saved for offline use.
   static const prefetchDays = 2;

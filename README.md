@@ -6,7 +6,8 @@ serving, pin your favorites, check your meal plan balances, and keep reading men
 in the basement of your residence hall gives out.
 
 > Not an official University of Illinois app. Menus and hours come live from University Housing's
-> public feed (see [Data sources](#data-sources)); meal plan balances are sample data.
+> public feed; meal plan balances come from your own University Housing account after you sign
+> in with your NetID (see [Data sources](#data-sources)).
 
 | Dining list | Menu (dark) | Offline | Balances (dark) |
 | --- | --- | --- | --- |
@@ -37,8 +38,10 @@ in the basement of your residence hall gives out.
     foreground, and on a timer that backs off from 15 seconds to 2 minutes. Once any request
     succeeds, every screen showing saved data refreshes itself.
   - Menus from past days are deleted automatically.
-- **Meal plan balances:** meal swipes and Dining Dollars remaining, with progress bars. The last
-  balance is also kept for offline viewing.
+- **Meal plan balances:** remaining meals, Dining Dollars and Illini Cash from your University
+  Housing account, with progress bars against your weekly allowance. Sign in once with your
+  NetID; balances refresh in the background and stay viewable offline. When the University ends
+  the session, the saved numbers stay up with a prompt to sign in again.
 - **Light and dark mode:** Illini Orange and Illini Blue themes that follow the system setting.
 
 ## Getting started
@@ -143,9 +146,27 @@ the `ILLINOIS_DINING_URL` repository variable or the workflow input.
 
 ### Meal plan balances
 
-Balances come from the same host, but they require the student's UIN and a University sign-in
-token. This app doesn't implement University SSO, so balances stay sample data unless you supply
-your own backend.
+Balances aren't in the public feed. The official app reads them from a Housing API using a token
+from its own registered sign-in, which other apps can't use. Instead, this app reads the same
+page students see in a browser:
+[MyHousing → Meal Plan Balances](https://web.housing.illinois.edu/MyHousing/MealPlanBalances).
+
+- **Sign-in:** *Sign in with NetID* opens that page in a WebView. The University redirects to its
+  normal sign-in (`shibboleth.illinois.edu`, then Duo), and the student signs in there. The
+  password goes to the University; the app never sees it, and the WebView can only visit
+  `illinois.edu` and Duo addresses.
+- **Reading:** once the Housing page loads, the app reads its visible text and parses the
+  *Meal Plan*, *Meals Remaining*, *Dining Dollars* and *Illini Cash* tiles
+  (`HousingBalanceApi.parseBalancesPage`). That's the only script the app runs, and only on that
+  page. Plan names like `CLASSIC 10/45 D$` give the weekly allowance (10 meals, $45) for the
+  progress bars.
+- **Refreshing:** later refreshes load the page in an off-screen WebView that shares the sign-in
+  cookies. If the University asks for a sign-in again, the app keeps the saved numbers and offers
+  *Sign in again*. Nothing is requested from the University until the student has signed in once,
+  and *Sign out of University Housing* clears the cookies and saved balances.
+
+`test/fixtures/meal_plan_balances.html` is the balance section of the real page; if Housing
+changes the page and balances stop appearing, update the fixture and the parser together.
 
 ### Custom backend
 

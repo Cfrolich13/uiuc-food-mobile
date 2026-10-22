@@ -10,11 +10,14 @@ import 'package:http/testing.dart';
 import 'package:illini_dining/app.dart';
 import 'package:illini_dining/data/demo_dining_api.dart';
 import 'package:illini_dining/data/dining_repository.dart';
+import 'package:illini_dining/data/housing_balance_api.dart';
 import 'package:illini_dining/data/illinois_dining_api.dart';
 import 'package:illini_dining/data/local_cache.dart';
 import 'package:illini_dining/models/menu.dart';
 import 'package:illini_dining/screens/halls_screen.dart';
+import 'package:illini_dining/state/controllers.dart';
 import 'package:illini_dining/widgets/formatting.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Thursday at noon: dining halls are serving lunch.
@@ -261,6 +264,64 @@ void main() {
     expect(find.textContaining(RegExp(r'^\d+ items · .+ and \d+ more$')), findsWidgets);
   });
 
+  testWidgets('balances: sign in, sign-in expiry and sign out', (tester) async {
+    final source = _FakeHousingSource();
+    final api = DemoDiningApi(latency: Duration.zero, now: () => _now);
+    await tester.binding.setSurfaceSize(const Size(430, 932));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(IlliniDiningApp(
+      repository: DiningRepository(
+        diningApi: api,
+        balanceApi: HousingBalanceApi(source),
+        cache: MemoryCache(),
+        now: () => _now,
+      ),
+      preferences: await SharedPreferences.getInstance(),
+      clock: Clock(() => _now),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Balances'));
+    await tester.pumpAndSettle();
+
+    // Never signed in: a prompt, no numbers.
+    expect(find.text('Sign in with NetID'), findsOneWidget);
+
+    // The sign-in screen (a WebView, not available in tests) hands back
+    // what it read from the University page.
+    final controller = Provider.of<BalanceController>(
+        tester.element(find.text('Sign in with NetID')), listen: false);
+    source.page = _signedInPage;
+    await controller.acceptSignIn(HousingBalanceApi.parseBalancesPage(_signedInPage)!);
+    await tester.pumpAndSettle();
+    expect(find.text(r'CLASSIC 10/45 D$'), findsOneWidget);
+    expect(find.text('5'), findsOneWidget);
+    expect(find.text(r'$43.50'), findsOneWidget);
+    expect(find.text(r'left · $45.00 per week'), findsOneWidget);
+    expect(find.text('Updated just now'), findsOneWidget);
+
+    // The University session expires: saved numbers stay, with a way back in.
+    source.page = null;
+    await controller.refresh();
+    await tester.pumpAndSettle();
+    expect(find.text(r'$43.50'), findsOneWidget);
+    expect(find.text('Sign-in expired · balances saved just now'), findsOneWidget);
+    expect(find.text('Sign in again to update'), findsOneWidget);
+
+    // Signing out forgets everything.
+    source.page = _signedInPage;
+    await controller.refresh();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Sign out of University Housing'), 100,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text('Sign out of University Housing'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign out'));
+    await tester.pumpAndSettle();
+    expect(source.signedOut, isTrue);
+    expect(find.text('Sign in with NetID'), findsOneWidget);
+    expect(find.text(r'$43.50'), findsNothing);
+  });
+
   testWidgets('hours sheet stays clear of the Dynamic Island and can be closed', (tester) async {
     // iPhone-style top inset for the status bar and Dynamic Island.
     tester.view.padding = FakeViewPadding(top: 59 * tester.view.devicePixelRatio);
@@ -294,7 +355,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final balance = demoBalanceFor(_now);
-    expect(find.text('Meal Swipes'), findsOneWidget);
+    expect(find.text('Meals'), findsOneWidget);
     expect(find.text('${balance.mealSwipesRemaining}'), findsOneWidget);
     expect(find.text('Dining Dollars'), findsOneWidget);
     expect(find.text(formatCurrency(balance.diningDollars)), findsOneWidget);
@@ -355,3 +416,30 @@ void _expectNoEllipsis(WidgetTester tester) {
   expect(truncated, isEmpty, reason: 'texts that were cut off');
 }
 
+const _signedInPage = r'''
+Meal Plan Balances
+Meal Plan
+CLASSIC 10/45 D$
+Meals Remaining
+5
+Dining Dollars
+$43.5
+Illini Cash
+$0
+''';
+
+/// Stands in for the WebView: returns [page] when "signed in", else asks for
+/// a sign-in.
+class _FakeHousingSource implements BalancePageSource {
+  String? page;
+  bool signedOut = false;
+
+  @override
+  Future<String> loadBalancePageText() async => page ?? (throw const SignInRequired());
+
+  @override
+  Future<void> signOut() async {
+    signedOut = true;
+    page = null;
+  }
+}

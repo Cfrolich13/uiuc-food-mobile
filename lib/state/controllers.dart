@@ -1,5 +1,6 @@
 import '../config.dart';
 import '../data/dining_repository.dart';
+import '../data/housing_balance_api.dart';
 import '../models/balance.dart';
 import '../models/campus_time.dart';
 import '../models/dining_hall.dart';
@@ -100,14 +101,43 @@ class HallsController extends Loader<List<DiningHall>> {
 }
 
 class BalanceController extends Loader<MealPlanBalance> {
-  BalanceController(this.repository) : super(network: repository.network);
+  BalanceController(this.repository, {this.onSignedIn}) : super(network: repository.network);
 
   final DiningRepository repository;
 
+  /// Called after a successful University sign-in, so the source can start
+  /// refreshing in the background.
+  final Future<void> Function()? onSignedIn;
+
+  /// Whether balances come from University Housing and need a NetID sign-in.
+  bool get usesUniversitySignIn => repository.balanceApi is HousingBalanceApi;
+
+  /// Whether the student needs to sign in (again) to update balances.
+  bool get needsSignIn => state.error is SignInRequired;
+
   Future<void> refresh() => load(repository.balance());
 
+  /// Retrying won't help until the student signs in.
   @override
-  Future<void> retry() => refresh();
+  Future<void> retry() async {
+    if (!needsSignIn) await refresh();
+  }
+
+  /// Shows balances read by the sign-in screen and keeps them for offline use.
+  Future<void> acceptSignIn(MealPlanBalance balance) async {
+    await onSignedIn?.call();
+    final savedAt = await repository.saveBalance(balance);
+    await load(Stream.value(Loaded(data: balance, savedAt: savedAt)));
+  }
+
+  /// Forgets the University sign-in and the saved balances on this device.
+  Future<void> signOut() async {
+    final api = repository.balanceApi;
+    if (api is HousingBalanceApi) await api.source.signOut();
+    await repository.clearBalance();
+    reset();
+    await load(Stream.value(const Loaded(error: SignInRequired())));
+  }
 }
 
 /// The menu for one venue on one day.
