@@ -165,6 +165,13 @@ class DiningHall {
   static bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  /// Meal periods being served at [now]; several can overlap (e.g. Lunch,
+  /// Kosher Lunch and Field of Greens at LAR).
+  List<String> openMealsAt(DateTime now) => [
+        for (final h in hoursOn(now))
+          if (h.isOpenAt(now)) h.meal,
+      ];
+
   OpenStatus statusAt(DateTime now) {
     final today = hoursOn(now);
     for (final h in today) {

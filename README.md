@@ -16,8 +16,10 @@ in the basement of your residence hall gives out.
 
 - **What's being served:** all 14 University Housing dining halls, cafés and markets, with live
   open/closed status ("Open until 3:00 PM · Lunch", "Closed · Dinner at 4:30 PM"). Each menu is
-  split by meal (including Light Lunch, Kosher and Field of Greens), station and course. Menus
-  open on the meal being served right now, and you can browse the next 7 days.
+  split by meal (including Light Lunch, Kosher and Field of Greens), station and course. While a
+  location is open, its card lists the stations serving right now. Menus open on the meal being
+  served now, with stations collapsed so you can expand just what you want, and you can browse
+  the next 7 days.
 - **Dietary filters:** Vegan, Vegetarian, Halal, Kosher and Jain filters, kept between launches.
   Only diets that appear on the current menu are offered. Every item lists what it contains
   (gluten, milk, eggs, soy, nuts…).
@@ -29,7 +31,11 @@ in the basement of your residence hall gives out.
   network.
   - Today's and tomorrow's menus for every location are downloaded automatically, favorites first.
   - Settings can download the whole week.
-  - When you're offline, a banner says when the menu you're looking at was saved.
+  - A quiet status line always says when the data on screen was updated, or that you're
+    offline and when it was saved.
+  - While offline, the app retries when the network connection changes, when it returns to the
+    foreground, and on a timer that backs off from 15 seconds to 2 minutes. Once any request
+    succeeds, every screen showing saved data refreshes itself.
   - Menus from past days are deleted automatically.
 - **Meal plan balances:** meal swipes and Dining Dollars remaining, with progress bars. The last
   balance is also kept for offline viewing.
@@ -46,14 +52,21 @@ flutter analyze
 dart run tool/live_feed_check.dart              # checks the live feed still parses
 ```
 
-### iOS builds (CI)
+### App builds (CI)
 
-`.github/workflows/ios-build.yml` builds an **unsigned** `.ipa` on every push. It runs analyze and
-tests first, then uploads the `.ipa` as a workflow artifact, kept for 30 days. The download is
-the `.ipa` itself, not a zip. To run it by hand,
-go to **Actions → iOS build → Run workflow**. Builds use the live feed by default; the optional
-inputs override its URL or add a custom backend. Sign the `.ipa` yourself before installing it, for example with
-Sideloadly, AltStore or `codesign`.
+`.github/workflows/build.yml` runs on every push. It analyzes and tests once, then builds both
+apps in parallel and uploads them as workflow artifacts, kept for 30 days. Each download is the
+app file itself, not a zip.
+
+- **iOS:** an **unsigned** `.ipa`. Sign it yourself before installing, for example with
+  Sideloadly, AltStore or `codesign`.
+- **Android:** a release `.apk`, signed with Flutter's default debug key so it installs
+  directly (allow installs from unknown sources). Each CI machine generates its own debug key, so
+  installing a newer build over an older one may fail with a signature mismatch; uninstall the
+  old one first. A fixed signing key would avoid this.
+
+To run it by hand, go to **Actions → Build apps → Run workflow**. Builds use the live feed by
+default; the optional inputs override its URL or add a custom backend.
 
 To try the offline experience, open a few menus, turn on airplane mode, and reopen the app. Saved
 menus still load, with a banner saying when they were saved. Days that were never downloaded

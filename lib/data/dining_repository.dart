@@ -4,6 +4,7 @@ import '../models/dining_hall.dart';
 import '../models/menu.dart';
 import 'dining_api.dart';
 import 'local_cache.dart';
+import 'network_status.dart';
 
 /// A value that may come from the offline cache, the network, or neither.
 class Loaded<T> {
@@ -37,12 +38,18 @@ class DiningRepository {
     required this.diningApi,
     required this.balanceApi,
     required this.cache,
+    NetworkStatus? network,
     DateTime Function()? now,
-  }) : _now = now ?? CampusTime.now;
+  })  : network = network ?? NetworkStatus(),
+        _now = now ?? CampusTime.now;
 
   final DiningApi diningApi;
   final BalanceApi balanceApi;
   final LocalCache cache;
+
+  /// Updated after every network attempt, so screens can react to the feed
+  /// becoming reachable again.
+  final NetworkStatus network;
   final DateTime Function() _now;
 
   static const _hallsKey = 'halls';
@@ -91,6 +98,7 @@ class DiningRepository {
       final results = await Future.wait(batch.map((job) async {
         try {
           final menu = await diningApi.fetchMenu(job.$1, job.$2);
+          network.reportSuccess();
           await cache.write(menuKey(job.$1, job.$2), menu.toJson(), savedAt: _now());
           return true;
         } catch (_) {
@@ -114,6 +122,17 @@ class DiningRepository {
       }
     }
     return removed;
+  }
+
+  /// The saved menu for [hallId] on [day], without touching the network.
+  Future<DailyMenu?> savedMenu(String hallId, DateTime day) async {
+    final entry = await cache.read(menuKey(hallId, day));
+    if (entry == null) return null;
+    try {
+      return DailyMenu.fromJson(entry.data as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<int> cachedMenuCount() async => (await cache.keys(prefix: _menuPrefix)).length;
@@ -142,13 +161,19 @@ class DiningRepository {
     }
     yield Loaded(data: cached, savedAt: cachedAt, refreshing: true);
 
+    T fresh;
     try {
-      final fresh = await fetch();
-      final now = _now();
-      await cache.write(key, encode(fresh), savedAt: now);
-      yield Loaded(data: fresh, savedAt: now);
+      fresh = await fetch();
     } catch (e) {
       yield Loaded(data: cached, savedAt: cachedAt, error: e);
+      network.reportFailure();
+      return;
     }
+    final now = _now();
+    await cache.write(key, encode(fresh), savedAt: now);
+    yield Loaded(data: fresh, savedAt: now);
+    // Reported after the fresh value is out, so listeners that refresh in
+    // response don't race this load.
+    network.reportSuccess();
   }
 }

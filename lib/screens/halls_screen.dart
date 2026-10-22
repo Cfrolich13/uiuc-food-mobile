@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/dining_hall.dart';
+import '../models/menu.dart';
 import '../state/controllers.dart';
 import '../state/user_prefs.dart';
 import '../widgets/common.dart';
@@ -119,14 +120,10 @@ class _HallsScreenState extends State<HallsScreen> {
     );
   }
 
-  Widget _note(BuildContext context) {
-    final state = context.read<HallsController>().state;
-    if (!state.isOffline) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-      child: OfflineNote(state: state, what: 'hours'),
-    );
-  }
+  Widget _note(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+        child: SyncNote(state: context.read<HallsController>().state, what: 'locations'),
+      );
 
   /// Keeps pull-to-refresh working when the content doesn't scroll.
   Widget _scrollable(Widget child) => LayoutBuilder(
@@ -170,6 +167,9 @@ class _HallCard extends StatelessWidget {
     final now = context.read<Clock>().now();
     final status = hall.statusAt(now);
     final theme = Theme.of(context);
+    final stations = status.isOpen
+        ? openStations(hall, context.read<HallsController>().todayMenu(hall.id), now)
+        : const <String>[];
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -198,6 +198,22 @@ class _HallCard extends StatelessWidget {
                       Text(hall.name, style: theme.textTheme.titleMedium),
                       const SizedBox(height: 4),
                       StatusLabel(isOpen: status.isOpen, text: describeStatus(status, now)),
+                      if (stations.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Semantics(
+                            label: 'Serving now at ${stations.join(', ')}',
+                            excludeSemantics: true,
+                            child: Text(
+                              // Non-breaking spaces keep each station name on one line.
+                              stations.map((s) => s.replaceAll(' ', '\u00A0')).join(' · '),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -213,4 +229,20 @@ class _HallCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Stations serving at [now], across every meal period open at the time
+/// (e.g. LAR's lunch line, Kosher Kitchen and Field of Greens together).
+///
+/// Empty for a location with a single station, where the list would only
+/// repeat its name, or when today's menu isn't saved.
+List<String> openStations(DiningHall hall, DailyMenu? menu, DateTime now) {
+  if (menu == null) return const [];
+  final openMeals = hall.openMealsAt(now).toSet();
+  final names = <String>{
+    for (final meal in menu.meals)
+      if (openMeals.contains(meal.name))
+        for (final station in meal.stations) station.name,
+  };
+  return names.length < 2 ? const [] : names.toList();
 }

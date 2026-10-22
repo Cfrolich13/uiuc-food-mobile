@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -29,7 +30,7 @@ class _Harness {
   final MemoryCache cache;
   late final DiningRepository repository;
 
-  Future<void> pump(WidgetTester tester, {bool settle = true}) async {
+  Future<void> pump(WidgetTester tester, {bool settle = true, Stream<Object?>? connectivity}) async {
     await tester.binding.setSurfaceSize(const Size(430, 932));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(IlliniDiningApp(
@@ -37,6 +38,7 @@ class _Harness {
       preferences: await SharedPreferences.getInstance(),
       demoApi: api,
       clock: Clock(() => _now),
+      connectivityChanges: connectivity,
     ));
     if (settle) await tester.pumpAndSettle();
   }
@@ -200,6 +202,46 @@ void main() {
       await tester.pumpAndSettle();
     }
     expect(extents, hasLength(1), reason: 'maxScrollExtent changed while scrolling: $extents');
+  });
+
+  testWidgets('cards list the stations serving now', (tester) async {
+    await _pumpWithLiveCapture(tester); // 12:10 PM on a Thursday
+    // LAR runs three periods at once; all of their stations are listed.
+    expect(find.text('LAR · Field\u00A0of\u00A0Greens · Kosher\u00A0Kitchen'), findsOneWidget);
+    expect(find.textContaining("Don's\u00A0Chophouse"), findsOneWidget);
+    // Caffeinator is a single station, so it has no list.
+    expect(find.text('Caffeinator'), findsNothing);
+  });
+
+  testWidgets('status line always shows when data was updated', (tester) async {
+    await _Harness().pump(tester);
+    expect(find.text('Updated just now'), findsOneWidget);
+    await tester.tap(find.text('Ikenberry Dining Center'));
+    await tester.pumpAndSettle();
+    expect(find.text('Updated just now'), findsWidgets);
+  });
+
+  testWidgets('screens refresh themselves when the network comes back', (tester) async {
+    final harness = _Harness();
+    final connectivity = StreamController<Object?>();
+    addTearDown(connectivity.close);
+    await harness.pump(tester, connectivity: connectivity.stream);
+
+    harness.api.offline = true;
+    await tester.tap(find.text('Illinois Street Dining Center'));
+    await tester.pumpAndSettle();
+    expect(find.text('Offline · menu saved just now'), findsOneWidget);
+
+    // The phone reconnects: no pull-to-refresh needed on any screen.
+    harness.api.offline = false;
+    connectivity.add('wifi');
+    await tester.pumpAndSettle();
+    expect(find.text('Offline · menu saved just now'), findsNothing);
+    expect(find.text('Updated just now'), findsWidgets);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Offline'), findsNothing);
   });
 
   testWidgets('hours sheet stays clear of the Dynamic Island and can be closed', (tester) async {

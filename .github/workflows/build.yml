@@ -1,0 +1,146 @@
+name: Build apps
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      illinois_dining_url:
+        description: "Optional ILLINOIS_DINING_URL override. Leave empty for the live University Housing feed."
+        required: false
+        default: ""
+      api_base_url:
+        description: "Optional DINING_API_BASE_URL for a custom backend (adds real balances)."
+        required: false
+        default: ""
+
+# A newer push to the same branch supersedes an in-progress build.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.7"
+  # Pushes use the repository variable; manual runs can override it.
+  ILLINOIS_DINING_URL: ${{ inputs.illinois_dining_url || vars.ILLINOIS_DINING_URL }}
+  API_BASE_URL: ${{ inputs.api_base_url }}
+
+jobs:
+  check:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  build-ios:
+    name: Build unsigned IPA
+    needs: check
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Build iOS app (no code signing)
+        run: |
+          args=(--release --no-codesign --build-number="$GITHUB_RUN_NUMBER")
+          if [ -n "$ILLINOIS_DINING_URL" ]; then
+            args+=(--dart-define=ILLINOIS_DINING_URL="$ILLINOIS_DINING_URL")
+          fi
+          if [ -n "$API_BASE_URL" ]; then
+            args+=(--dart-define=DINING_API_BASE_URL="$API_BASE_URL")
+          fi
+          flutter build ios "${args[@]}"
+
+      # An .ipa is a zip with the .app inside a top-level Payload/ folder.
+      - name: Package IPA
+        id: package
+        run: |
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          name="IlliniDining-${version}-${GITHUB_RUN_NUMBER}-unsigned"
+          mkdir -p build/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/
+          (cd build/ipa && zip -qry "${name}.ipa" Payload)
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          ls -lh "build/ipa/${name}.ipa"
+
+      # archive: false uploads the file itself rather than a zip containing it;
+      # the artifact takes the file's name.
+      - uses: actions/upload-artifact@v7
+        with:
+          path: build/ipa/${{ steps.package.outputs.name }}.ipa
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+  build-android:
+    name: Build APK
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      # The Android Gradle Plugin needs JDK 17+; the project targets JVM 17.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # Release build, signed with Flutter's default debug key (see
+      # android/app/build.gradle.kts) so it installs directly on a device.
+      - name: Build Android APK
+        run: |
+          args=(--release --build-number="$GITHUB_RUN_NUMBER")
+          if [ -n "$ILLINOIS_DINING_URL" ]; then
+            args+=(--dart-define=ILLINOIS_DINING_URL="$ILLINOIS_DINING_URL")
+          fi
+          if [ -n "$API_BASE_URL" ]; then
+            args+=(--dart-define=DINING_API_BASE_URL="$API_BASE_URL")
+          fi
+          flutter build apk "${args[@]}"
+
+      - name: Rename APK
+        id: package
+        run: |
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          name="IlliniDining-${version}-${GITHUB_RUN_NUMBER}"
+          cp build/app/outputs/flutter-apk/app-release.apk "build/${name}.apk"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          ls -lh "build/${name}.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          path: build/${{ steps.package.outputs.name }}.apk
+          archive: false
+          if-no-files-found: error
+          retention-days: 30

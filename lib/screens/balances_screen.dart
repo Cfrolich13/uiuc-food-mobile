@@ -16,7 +16,6 @@ class BalancesScreen extends StatelessWidget {
     final controller = context.watch<BalanceController>();
     final state = controller.state;
     final balance = state.data;
-    final now = context.read<Clock>().now();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Meal Plan')),
@@ -47,18 +46,10 @@ class BalancesScreen extends StatelessWidget {
                   else ...[
                     Text(balance.planName,
                         style: Theme.of(context).textTheme.headlineSmall),
-                    if (state.isOffline)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 16),
-                        child: OfflineNote(state: state, what: 'balances'),
-                      )
-                    else if (state.savedAt != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 16),
-                        child: Text('Updated ${formatSavedAt(state.savedAt!, now)}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 16),
+                      child: SyncNote(state: state, what: 'balances'),
+                    ),
                     _SwipesCard(balance: balance),
                     const SizedBox(height: 12),
                     _DiningDollarsCard(balance: balance),

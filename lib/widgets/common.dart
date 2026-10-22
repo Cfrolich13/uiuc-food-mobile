@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,13 +8,13 @@ import '../models/menu.dart';
 import '../theme/app_theme.dart';
 import 'formatting.dart';
 
-/// A quiet one-line note that the data on screen is a saved copy because the
-/// network couldn't be reached, e.g. "Offline · menu saved today at 9:41 AM".
+/// A quiet one-line status for the data on screen: "Updated 5 min ago", or
+/// "Offline · menu saved today at 9:41 AM" when the last refresh failed.
 ///
-/// Sits inline with the content rather than over it; pull to refresh retries.
-/// Screens show their own empty state when there's nothing saved at all.
-class OfflineNote extends StatelessWidget {
-  const OfflineNote({super.key, required this.state, required this.what});
+/// Sits inline with the content rather than over it, and keeps its relative
+/// time current. Screens show their own empty state when nothing is saved.
+class SyncNote extends StatefulWidget {
+  const SyncNote({super.key, required this.state, required this.what});
 
   final Loaded<Object?> state;
 
@@ -20,21 +22,50 @@ class OfflineNote extends StatelessWidget {
   final String what;
 
   @override
+  State<SyncNote> createState() => _SyncNoteState();
+}
+
+class _SyncNoteState extends State<SyncNote> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    // "Updated 4 min ago" should become "5 min ago" without a rebuild.
+    _ticker = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!state.isOffline) return const SizedBox.shrink();
+    final state = widget.state;
+    final savedAt = state.savedAt;
+    if (!state.isOffline && savedAt == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final color = theme.colorScheme.onSurfaceVariant;
     final now = context.read<Clock>().now();
-    final saved = state.savedAt == null ? '' : ' saved ${formatSavedAt(state.savedAt!, now)}';
-    return Row(
-      children: [
-        Icon(Icons.cloud_off_rounded, size: 14, color: color),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text('Offline · $what$saved',
-              style: theme.textTheme.bodySmall?.copyWith(color: color)),
-        ),
-      ],
+    final when = savedAt == null ? null : formatSavedAt(savedAt, now);
+    final (icon, text) = state.isOffline
+        ? (Icons.cloud_off_rounded, 'Offline · ${widget.what}${when == null ? '' : ' saved $when'}')
+        : (Icons.cloud_done_outlined, 'Updated $when');
+    return Semantics(
+      liveRegion: true,
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: color)),
+          ),
+        ],
+      ),
     );
   }
 }

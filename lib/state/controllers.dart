@@ -10,7 +10,8 @@ import 'user_prefs.dart';
 /// The list of dining locations. Also keeps upcoming menus saved for offline use.
 class HallsController extends Loader<List<DiningHall>> {
   HallsController(this.repository, this.prefs, {DateTime Function()? now})
-      : _now = now ?? CampusTime.now;
+      : _now = now ?? CampusTime.now,
+        super(network: repository.network);
 
   final DiningRepository repository;
   final UserPrefs prefs;
@@ -25,15 +26,44 @@ class HallsController extends Loader<List<DiningHall>> {
   /// When upcoming menus were last saved to the device this session.
   DateTime? get lastOfflineSync => _lastOfflineSync;
 
+  /// Today's saved menu per location, for showing open stations on cards.
+  Map<String, DailyMenu> _todayMenus = const {};
+
   Future<void> refresh() => load(repository.halls());
+
+  @override
+  Future<void> retry() => refresh();
 
   DiningHall? byId(String id) => state.data?.where((h) => h.id == id).firstOrNull;
 
+  /// Today's menu for [hallId], if it's saved on the device.
+  DailyMenu? todayMenu(String hallId) {
+    final menu = _todayMenus[hallId];
+    return menu != null && menu.date == dateKey(_today()) ? menu : null;
+  }
+
   @override
   void onLoaded(Loaded<List<DiningHall>> value) {
-    if (value.error == null && value.data != null) {
+    if (value.data == null) return;
+    if (value.error == null) {
       syncMenus(days: AppConfig.prefetchDays);
+    } else {
+      // Offline: today's menus may already be saved from an earlier sync.
+      _loadTodayMenus();
     }
+  }
+
+  Future<void> _loadTodayMenus() async {
+    final halls = state.data;
+    if (halls == null) return;
+    final today = _today();
+    final menus = <String, DailyMenu>{};
+    for (final hall in halls) {
+      final menu = await repository.savedMenu(hall.id, today);
+      if (menu != null) menus[hall.id] = menu;
+    }
+    _todayMenus = menus;
+    notifyListeners();
   }
 
   /// Saves menus for the next [days] days (starting today) to the device.
@@ -55,6 +85,7 @@ class HallsController extends Loader<List<DiningHall>> {
         [for (var i = 0; i < days; i++) DateTime(today.year, today.month, today.day + i)],
       );
       if (saved > 0) _lastOfflineSync = _now();
+      await _loadTodayMenus();
       return saved;
     } finally {
       _syncing = false;
@@ -69,22 +100,34 @@ class HallsController extends Loader<List<DiningHall>> {
 }
 
 class BalanceController extends Loader<MealPlanBalance> {
-  BalanceController(this.repository);
+  BalanceController(this.repository) : super(network: repository.network);
 
   final DiningRepository repository;
 
   Future<void> refresh() => load(repository.balance());
+
+  @override
+  Future<void> retry() => refresh();
 }
 
 /// The menu for one venue on one day.
 class DailyMenuController extends Loader<DailyMenu> {
-  DailyMenuController(this.repository, this.hallId);
+  DailyMenuController(this.repository, this.hallId) : super(network: repository.network);
 
   final DiningRepository repository;
   final String hallId;
+  DateTime? _day;
 
   Future<void> loadDay(DateTime day) {
+    _day = day;
     reset();
     return load(repository.menu(hallId, day));
+  }
+
+  /// Refreshes the current day, keeping the saved menu on screen meanwhile.
+  @override
+  Future<void> retry() async {
+    final day = _day;
+    if (day != null) await load(repository.menu(hallId, day));
   }
 }

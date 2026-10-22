@@ -134,7 +134,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
                       hours:
                           hall?.hoursOn(_day).where((h) => h.meal == meal.name).toList() ??
                           const [],
-                      note: OfflineNote(state: state, what: 'menu'),
+                      note: SyncNote(state: state, what: 'menu'),
                     ),
                   ),
               ],
