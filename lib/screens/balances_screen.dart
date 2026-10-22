@@ -19,18 +19,9 @@ class BalancesScreen extends StatelessWidget {
     final now = context.read<Clock>().now();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Meal Plan'),
-        bottom: state.refreshing
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(2),
-                child: LinearProgressIndicator(minHeight: 2),
-              )
-            : null,
-      ),
+      appBar: AppBar(title: const Text('Meal Plan')),
       body: Column(
         children: [
-          OfflineBanner(state: state, what: 'balances', onRetry: controller.refresh),
           Expanded(
             child: RefreshIndicator(
               onRefresh: controller.refresh,
@@ -56,7 +47,12 @@ class BalancesScreen extends StatelessWidget {
                   else ...[
                     Text(balance.planName,
                         style: Theme.of(context).textTheme.headlineSmall),
-                    if (state.savedAt != null)
+                    if (state.isOffline)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 16),
+                        child: OfflineNote(state: state, what: 'balances'),
+                      )
+                    else if (state.savedAt != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4, bottom: 16),
                         child: Text('Updated ${formatSavedAt(state.savedAt!, now)}',

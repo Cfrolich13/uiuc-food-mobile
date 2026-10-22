@@ -22,7 +22,7 @@ class IllinoisDiningApi implements DiningApi {
   IllinoisDiningApi({
     this.baseUrl = defaultBaseUrl,
     http.Client? client,
-    this.timeout = const Duration(seconds: 15),
+    this.timeout = const Duration(seconds: 8),
   }) : _client = client ?? http.Client();
 
   static const defaultBaseUrl = 'https://web.housing.illinois.edu/MobileAppWS/api';
@@ -30,6 +30,19 @@ class IllinoisDiningApi implements DiningApi {
   final String baseUrl;
   final Duration timeout;
   final http.Client _client;
+
+  /// After a connection failure, assume we're still offline for a while and
+  /// give up sooner, so the app falls back to saved menus quickly.
+  static const _offlineTimeout = Duration(seconds: 4);
+  static const _offlineWindow = Duration(seconds: 30);
+  DateTime? _lastConnectionFailure;
+
+  Duration get _currentTimeout {
+    final failed = _lastConnectionFailure;
+    final recentlyOffline =
+        failed != null && DateTime.now().difference(failed) < _offlineWindow;
+    return recentlyOffline ? _offlineTimeout : timeout;
+  }
 
   /// Meal start times from the last [fetchHalls], used to order a day's meals.
   final _sessionsByHall = <String, List<ServiceSession>>{};
@@ -72,7 +85,8 @@ class IllinoisDiningApi implements DiningApi {
       final response = await _client.get(Uri.parse('$base$path'), headers: {
         'Accept': 'application/json',
         'User-Agent': 'IlliniDining/1.0 (Flutter; +https://github.com/Cfrolich13/uiuc-food-mobile)',
-      }).timeout(timeout);
+      }).timeout(_currentTimeout);
+      _lastConnectionFailure = null;
       if (response.statusCode != 200) {
         throw DiningApiException('GET $path returned ${response.statusCode}');
       }
@@ -80,10 +94,12 @@ class IllinoisDiningApi implements DiningApi {
     } on DiningApiException {
       rethrow;
     } on TimeoutException {
+      _lastConnectionFailure = DateTime.now();
       throw DiningApiException('GET $path timed out');
     } on FormatException catch (e) {
       throw DiningApiException('GET $path returned invalid JSON: ${e.message}');
     } catch (e) {
+      _lastConnectionFailure = DateTime.now();
       throw DiningApiException('Network error: $e');
     }
   }

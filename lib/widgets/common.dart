@@ -6,41 +6,35 @@ import '../models/menu.dart';
 import '../theme/app_theme.dart';
 import 'formatting.dart';
 
-/// Explains that the data on screen is a saved copy because the network failed.
+/// A quiet one-line note that the data on screen is a saved copy because the
+/// network couldn't be reached, e.g. "Offline · menu saved today at 9:41 AM".
+///
+/// Sits inline with the content rather than over it; pull to refresh retries.
 /// Screens show their own empty state when there's nothing saved at all.
-class OfflineBanner extends StatelessWidget {
-  const OfflineBanner({super.key, required this.state, required this.what, this.onRetry});
+class OfflineNote extends StatelessWidget {
+  const OfflineNote({super.key, required this.state, required this.what});
 
   final Loaded<Object?> state;
 
   /// What's being shown, e.g. "menu" or "balances".
   final String what;
-  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
     if (!state.isOffline) return const SizedBox.shrink();
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant;
     final now = context.read<Clock>().now();
     final saved = state.savedAt == null ? '' : ' saved ${formatSavedAt(state.savedAt!, now)}';
-    final message = "You're offline. Showing $what$saved.";
-    return Material(
-      color: scheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-        child: Row(
-          children: [
-            Icon(Icons.cloud_off_rounded, size: 20, color: scheme.onTertiaryContainer),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(message,
-                  style: TextStyle(color: scheme.onTertiaryContainer)),
-            ),
-            if (onRetry != null)
-              TextButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
+    return Row(
+      children: [
+        Icon(Icons.cloud_off_rounded, size: 14, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text('Offline · $what$saved',
+              style: theme.textTheme.bodySmall?.copyWith(color: color)),
         ),
-      ),
+      ],
     );
   }
 }

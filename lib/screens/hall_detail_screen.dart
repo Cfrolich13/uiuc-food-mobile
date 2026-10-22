@@ -31,8 +31,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
     final now = context.read<Clock>().now();
     _today = DateTime(now.year, now.month, now.day);
     _day = _today;
-    _menu = DailyMenuController(context.read<DiningRepository>(), widget.hallId)
-      ..loadDay(_day);
+    _menu = DailyMenuController(context.read<DiningRepository>(), widget.hallId)..loadDay(_day);
   }
 
   @override
@@ -75,8 +74,6 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
           final state = _menu.state;
           return Column(
             children: [
-              if (state.refreshing) const LinearProgressIndicator(minHeight: 2),
-              OfflineBanner(state: state, what: 'menu', onRetry: () => _menu.loadDay(_day)),
               _DayPicker(today: _today, selected: _day, onSelected: _selectDay),
               _DietaryFilterBar(menu: state.data),
               Expanded(child: _content(context, hall, state)),
@@ -94,7 +91,8 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
       return EmptyState(
         icon: Icons.cloud_off_rounded,
         title: 'Menu not saved for offline use',
-        message: "This day's menu hasn't been downloaded yet. "
+        message:
+            "This day's menu hasn't been downloaded yet. "
             'Reconnect to view it.',
         action: FilledButton.tonal(
           onPressed: () => _menu.loadDay(_day),
@@ -131,8 +129,12 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
                   RefreshIndicator(
                     onRefresh: () => _menu.loadDay(_day),
                     child: _MealView(
+                      key: PageStorageKey('meal|${meal.name}'),
                       meal: meal,
-                      hours: hall?.hoursOn(_day).where((h) => h.meal == meal.name).toList() ?? const [],
+                      hours:
+                          hall?.hoursOn(_day).where((h) => h.meal == meal.name).toList() ??
+                          const [],
+                      note: OfflineNote(state: state, what: 'menu'),
                     ),
                   ),
               ],
@@ -158,6 +160,10 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
+      // Keep the sheet (and its drag handle) clear of the status bar and
+      // Dynamic Island, and leave some backdrop visible to tap away.
+      useSafeArea: true,
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.75),
       builder: (_) => _HallInfoSheet(hall: hall, today: _today),
     );
   }
@@ -233,102 +239,180 @@ class _DietaryFilterBar extends StatelessWidget {
   }
 }
 
-class _MealView extends StatelessWidget {
-  const _MealView({required this.meal, required this.hours});
+class _MealView extends StatefulWidget {
+  const _MealView({
+    super.key,
+    required this.meal,
+    required this.hours,
+    required this.note,
+  });
 
   final Meal meal;
   final List<ServiceHours> hours;
+
+  /// Shown above the stations, e.g. a quiet "offline" note.
+  final Widget note;
+
+  @override
+  State<_MealView> createState() => _MealViewState();
+}
+
+class _MealViewState extends State<_MealView> {
+  // Each tab needs its own controller: TabBarView builds neighbouring tabs
+  // while swiping, and they can't share the primary scroll controller.
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final prefs = context.watch<UserPrefs>();
     final theme = Theme.of(context);
+    final meal = widget.meal;
     final stations = [
-      for (final station in meal.stations)
-        (station, station.items.where(prefs.matches).toList()),
+      for (final station in meal.stations) (station.name, station.items.where(prefs.matches).toList()),
     ].where((s) => s.$2.isNotEmpty).toList();
+    final (sections, expanded) = _sections(stations);
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      children: [
-        if (hours.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12, left: 4),
-            child: Row(
-              children: [
-                Icon(Icons.schedule_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                const SizedBox(width: 6),
-                Text(
-                  hours
-                      .map((h) => '${formatMinutes(h.opensAt)} – ${formatMinutes(h.closesAt)}')
-                      .join(', '),
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-              ],
+    return Scrollbar(
+      controller: _scroll,
+      interactive: true,
+      child: ListView(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          if (widget.hours.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8, left: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.schedule_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Text(
+                    widget.hours
+                        .map((h) => '${formatMinutes(h.opensAt)} – ${formatMinutes(h.closesAt)}')
+                        .join(', '),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        if (stations.isEmpty)
-          EmptyState(
-            icon: Icons.filter_alt_off_rounded,
-            title: 'Nothing matches your filters',
-            message: 'Try removing a dietary filter.',
-            action: TextButton(
-              onPressed: prefs.clearDietaryFilters,
-              child: const Text('Clear filters'),
+          Padding(padding: const EdgeInsets.only(left: 4, bottom: 4), child: widget.note),
+          const SizedBox(height: 4),
+          if (sections.isEmpty)
+            EmptyState(
+              icon: Icons.filter_alt_off_rounded,
+              title: 'Nothing matches your filters',
+              message: 'Try removing a dietary filter.',
+              action: TextButton(
+                onPressed: prefs.clearDietaryFilters,
+                child: const Text('Clear filters'),
+              ),
             ),
-          ),
-        for (final (station, items) in stations)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _StationCard(name: station.name, items: items),
-          ),
-        if (stations.isNotEmpty)
-          _Legend(tags: stations.expand((s) => s.$2).expand((i) => i.tags).toSet()),
-      ],
+          for (final (name, items) in sections)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _StationCard(
+                key: PageStorageKey('section|${meal.name}|$name'),
+                name: name,
+                items: items,
+                initiallyExpanded: expanded,
+              ),
+            ),
+          if (sections.isNotEmpty)
+            _Legend(tags: sections.expand((s) => s.$2).expand((i) => i.tags).toSet()),
+        ],
+      ),
     );
+  }
+
+  /// The collapsible sections for a meal, and whether they start expanded.
+  ///
+  /// Normally one per station, collapsed. A meal served from a single station
+  /// (most cafés, LAR's lunch line) is split by course instead, since one
+  /// long station is the scrolling problem collapsing is meant to solve. Only
+  /// when there's nothing to split does the lone section start expanded.
+  static (List<(String, List<MenuItem>)>, bool) _sections(
+    List<(String, List<MenuItem>)> stations,
+  ) {
+    if (stations.length != 1) return (stations, false);
+    final byCourse = <String, List<MenuItem>>{};
+    for (final item in stations.single.$2) {
+      byCourse.putIfAbsent(item.course ?? 'Other', () => []).add(item);
+    }
+    if (byCourse.length < 2) return (stations, true);
+    return ([for (final e in byCourse.entries) (e.key, e.value)], false);
   }
 }
 
+/// A station, collapsed by default to its name, item count and a preview.
 class _StationCard extends StatelessWidget {
-  const _StationCard({required this.name, required this.items});
+  const _StationCard({
+    super.key,
+    required this.name,
+    required this.items,
+    required this.initiallyExpanded,
+  });
 
   final String name;
   final List<MenuItem> items;
+  final bool initiallyExpanded;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final count = items.length == 1 ? '1 item' : '${items.length} items';
+    final preview = items.take(3).map((i) => i.name).join(', ');
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Semantics(
-                header: true,
-                child: Text(name,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                        color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
-              ),
-            ),
-            for (final (i, item) in items.indexed) ...[
-              // Subheading when the course changes, e.g. Entrees → Starches.
-              if (item.course != null && (i == 0 || items[i - 1].course != item.course) &&
-                  items.any((other) => other.course != item.course))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  child: Text(item.course!.toUpperCase(),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant, letterSpacing: 0.8)),
-                ),
-              _MenuItemTile(item: item),
-            ],
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        // Remembers expanded/collapsed per station across tab switches.
+        key: PageStorageKey('tile|$name'),
+        initiallyExpanded: initiallyExpanded,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        title: Text(
+          name,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w700,
+          ),
         ),
+        subtitle: Text(
+          '$count · $preview',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        children: [
+          for (final (i, item) in items.indexed) ...[
+            // Subheading when the course changes, e.g. Entrees → Starches.
+            if (item.course != null &&
+                (i == 0 || items[i - 1].course != item.course) &&
+                items.any((other) => other.course != item.course))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Text(
+                  item.course!.toUpperCase(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            _MenuItemTile(item: item),
+          ],
+        ],
       ),
     );
   }
@@ -381,8 +465,8 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant);
+    final style = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
     return Padding(
       padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
       child: Wrap(
@@ -390,11 +474,14 @@ class _Legend extends StatelessWidget {
         runSpacing: 6,
         children: [
           for (final tag in DietaryTag.values.where(tags.contains))
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              DietaryBadge(tag),
-              const SizedBox(width: 4),
-              Text(tag.label, style: style),
-            ]),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DietaryBadge(tag),
+                const SizedBox(width: 4),
+                Text(tag.label, style: style),
+              ],
+            ),
         ],
       ),
     );
@@ -414,57 +501,83 @@ class _HallInfoSheet extends StatelessWidget {
     final week = [for (var i = 0; i < 7; i++) DateTime(today.year, today.month, today.day + i)];
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(hall.name, style: theme.textTheme.titleLarge),
-            if (hall.description != null) ...[
-              const SizedBox(height: 4),
-              Text(hall.description!, style: theme.textTheme.bodyMedium),
-            ],
-            const SizedBox(height: 12),
-            Row(children: [
-              Icon(Icons.place_outlined, size: 20, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Expanded(child: Text(hall.address)),
-            ]),
-            const SizedBox(height: 20),
-            Text('Hours', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            for (final day in week)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 96,
-                      child: Text(DateFormat('EEEE').format(day),
-                          style: day.weekday == today.weekday
-                              ? const TextStyle(fontWeight: FontWeight.w700)
-                              : null),
-                    ),
-                    Expanded(
-                      child: Text(
-                        hall.hoursOn(day).isEmpty
-                            ? 'Closed'
-                            : hall
-                                .hoursOn(day)
-                                .map((h) =>
-                                    '${h.meal}: ${formatMinutes(h.opensAt)} – ${formatMinutes(h.closesAt)}')
-                                .join('\n'),
-                        style: day.weekday == today.weekday
-                            ? const TextStyle(fontWeight: FontWeight.w700)
-                            : null,
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 8, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: Text(hall.name, style: theme.textTheme.titleLarge)),
+                IconButton(
+                  tooltip: 'Close',
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hall.description != null)
+                    Text(hall.description!, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(Icons.place_outlined, size: 20, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(hall.address)),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Hours', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  for (final day in week)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 96,
+                            child: Text(
+                              DateFormat('EEEE').format(day),
+                              style: day == today
+                                  ? const TextStyle(fontWeight: FontWeight.w700)
+                                  : null,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              hall.hoursOn(day).isEmpty
+                                  ? 'Closed'
+                                  : hall
+                                        .hoursOn(day)
+                                        .map(
+                                          (h) =>
+                                              '${h.meal}: ${formatMinutes(h.opensAt)} – ${formatMinutes(h.closesAt)}',
+                                        )
+                                        .join('\n'),
+                              style: day == today
+                                  ? const TextStyle(fontWeight: FontWeight.w700)
+                                  : null,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }

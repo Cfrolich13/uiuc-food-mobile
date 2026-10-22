@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:illini_dining/app.dart';
 import 'package:illini_dining/data/demo_dining_api.dart';
 import 'package:illini_dining/data/dining_repository.dart';
+import 'package:illini_dining/data/illinois_dining_api.dart';
 import 'package:illini_dining/data/local_cache.dart';
 import 'package:illini_dining/models/menu.dart';
 import 'package:illini_dining/screens/halls_screen.dart';
@@ -13,8 +19,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 final _now = DateTime(2026, 10, 22, 12);
 
 class _Harness {
-  _Harness()
-      : api = DemoDiningApi(latency: Duration.zero, now: () => _now),
+  _Harness({Duration latency = Duration.zero})
+      : api = DemoDiningApi(latency: latency, now: () => _now),
         cache = MemoryCache() {
     repository = DiningRepository(diningApi: api, balanceApi: api, cache: cache, now: () => _now);
   }
@@ -23,7 +29,7 @@ class _Harness {
   final MemoryCache cache;
   late final DiningRepository repository;
 
-  Future<void> pump(WidgetTester tester) async {
+  Future<void> pump(WidgetTester tester, {bool settle = true}) async {
     await tester.binding.setSurfaceSize(const Size(430, 932));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(IlliniDiningApp(
@@ -32,7 +38,7 @@ class _Harness {
       demoApi: api,
       clock: Clock(() => _now),
     ));
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
   }
 }
 
@@ -81,12 +87,22 @@ void main() {
     final tabBar = tester.widget<TabBar>(find.byType(TabBar));
     final controller = DefaultTabController.of(tester.element(find.byWidget(tabBar)));
     expect(controller.index, 1, reason: 'Lunch is being served at noon');
-    expect(find.text('Grill'), findsOneWidget);
+    expect(find.byType(Scrollbar), findsWidgets);
 
+    // Stations start collapsed: names and item counts only.
     final lunch = buildDemoMenu(demoHalls.first, _now).meals[1];
-    final nonVegan = lunch.stations
-        .expand((s) => s.items)
-        .firstWhere((i) => !i.tags.contains(DietaryTag.vegan));
+    final station = lunch.stations
+        .firstWhere((s) => s.items.any((i) => !i.tags.contains(DietaryTag.vegan)));
+    final nonVegan = station.items.firstWhere((i) => !i.tags.contains(DietaryTag.vegan));
+    expect(find.text(station.name), findsOneWidget);
+    expect(find.textContaining('${station.items.length} items · '), findsWidgets);
+    expect(find.text(nonVegan.name), findsNothing);
+
+    // Expanding one station shows its items.
+    await tester.scrollUntilVisible(find.text(station.name), 200,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text(station.name));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text(nonVegan.name), 200,
         scrollable: find.byType(Scrollable).last);
     expect(find.text(nonVegan.name), findsOneWidget);
@@ -104,13 +120,109 @@ void main() {
     await tester.tap(find.text('Illinois Street Dining Center'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining("You're offline. Showing menu saved"), findsOneWidget);
+    expect(find.text('Offline · menu saved just now'), findsOneWidget);
     expect(find.text('Grill'), findsOneWidget);
+    expect(find.byType(MaterialBanner), findsNothing);
 
     // A day that was never downloaded explains why it's missing.
     await tester.tap(find.widgetWithText(ChoiceChip, 'Sat 24'));
     await tester.pumpAndSettle();
     expect(find.text('Menu not saved for offline use'), findsOneWidget);
+  });
+
+  testWidgets('saved data shows at once while refreshing, with no spinner', (tester) async {
+    final harness = _Harness(latency: const Duration(seconds: 1));
+    await harness.pump(tester, settle: false);
+    // First launch has nothing saved, so a spinner is the only option.
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.pump(const Duration(seconds: 10)); // list + background menu sync
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Illinois Street Dining Center'));
+    await tester.pump(); // start the page transition
+    await tester.pump(const Duration(milliseconds: 400)); // finish it; network still pending
+    // The saved menu is up while the network refresh is still in flight.
+    expect(find.text('Grill'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('single-station menus start expanded', (tester) async {
+    await _Harness().pump(tester);
+    final chomps = buildDemoMenu(demoHalls.firstWhere((h) => h.id == 'chomps'), _now);
+    final station = chomps.meals.single.stations.single;
+
+    await tester.scrollUntilVisible(find.text('Chomps'), 200,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Chomps'));
+    await tester.pumpAndSettle();
+    expect(find.text(station.items.first.name), findsOneWidget, reason: 'no tap needed');
+  });
+
+  testWidgets('a single-station meal is split into collapsible courses', (tester) async {
+    // Real capture: LAR's lunch is one "LAR" line with many courses.
+    final api = IllinoisDiningApi(client: MockClient((request) async {
+      final name = switch (request.url.path) {
+        '/MobileAppWS/api/LocationSchedules' => 'location_schedules.json',
+        '/MobileAppWS/api/Menu/5/10-22-2026' => 'menu_5_2026-10-22.json',
+        _ => null,
+      };
+      return name == null
+          ? http.Response('[]', 200)
+          : http.Response.bytes(File('test/fixtures/$name').readAsBytesSync(), 200);
+    }));
+    final now = DateTime(2026, 10, 22, 12, 10);
+    await tester.binding.setSurfaceSize(const Size(430, 932));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(IlliniDiningApp(
+      repository: DiningRepository(
+          diningApi: api, balanceApi: DemoDiningApi(latency: Duration.zero), cache: MemoryCache(), now: () => now),
+      preferences: await SharedPreferences.getInstance(),
+      clock: Clock(() => now),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lincoln/Allen Dining Hall at Lincoln/Allen (LAR)'));
+    await tester.pumpAndSettle();
+
+    final lunch = (jsonDecode(File('test/fixtures/menu_5_2026-10-22.json').readAsStringSync()) as List)
+        .cast<Map<String, dynamic>>()
+        .where((i) => i['Meal'] == 'Lunch' && i['Course'] == 'Entrees')
+        .toList();
+    expect(find.text('Entrees'), findsOneWidget, reason: 'courses are the sections');
+    expect(find.text('LAR'), findsNothing);
+    expect(find.text(lunch.first['FormalName'] as String), findsNothing, reason: 'collapsed');
+
+    await tester.tap(find.text('Entrees'));
+    await tester.pumpAndSettle();
+    expect(find.text(lunch.first['FormalName'] as String), findsOneWidget);
+  });
+
+  testWidgets('hours sheet stays clear of the Dynamic Island and can be closed', (tester) async {
+    // iPhone-style top inset for the status bar and Dynamic Island.
+    tester.view.padding = FakeViewPadding(top: 59 * tester.view.devicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    await _Harness().pump(tester);
+    await tester.tap(find.text('Ikenberry Dining Center'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Hours & location'));
+    await tester.pumpAndSettle();
+    final sheet = tester.getRect(find.byType(BottomSheet));
+    expect(sheet.top, greaterThan(932 * 0.25 - 1), reason: 'leaves backdrop to tap');
+    expect(sheet.top, greaterThanOrEqualTo(59));
+
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+
+    // Tapping the backdrop above the sheet also closes it.
+    await tester.tap(find.byTooltip('Hours & location'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(215, 100));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
   });
 
   testWidgets('shows meal swipes and dining dollars', (tester) async {

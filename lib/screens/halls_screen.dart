@@ -22,6 +22,7 @@ class HallsScreen extends StatefulWidget {
 
 class _HallsScreenState extends State<HallsScreen> {
   Timer? _ticker;
+  final _scroll = ScrollController();
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _HallsScreenState extends State<HallsScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -46,28 +48,19 @@ class _HallsScreenState extends State<HallsScreen> {
     final halls = state.data;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.favoritesOnly ? 'Favorites' : 'Illini Dining'),
-        bottom: state.refreshing
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(2),
-                child: LinearProgressIndicator(minHeight: 2),
-              )
-            : null,
-      ),
-      body: Column(
-        children: [
-          OfflineBanner(state: state, what: 'locations', onRetry: controller.refresh),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await controller.refresh();
-                await controller.syncMenus();
-              },
-              child: _body(context, halls, prefs, state.refreshing),
-            ),
-          ),
-        ],
+      appBar: AppBar(title: Text(widget.favoritesOnly ? 'Favorites' : 'Illini Dining')),
+      // Saved data shows straight away and refreshes quietly in the background;
+      // a spinner only appears when there's nothing saved to show.
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await controller.refresh();
+          await controller.syncMenus();
+        },
+        child: Scrollbar(
+          controller: _scroll,
+          interactive: true,
+          child: _body(context, halls, prefs, state.refreshing),
+        ),
       ),
     );
   }
@@ -92,8 +85,12 @@ class _HallsScreenState extends State<HallsScreen> {
         ));
       }
       return ListView(
+        controller: _scroll,
         padding: const EdgeInsets.all(16),
-        children: [for (final hall in favorites) _HallCard(hall: hall)],
+        children: [
+          _note(context),
+          for (final hall in favorites) _HallCard(hall: hall),
+        ],
       );
     }
 
@@ -102,8 +99,10 @@ class _HallsScreenState extends State<HallsScreen> {
     final cafes = others.where((h) => h.type == VenueType.cafe).toList();
 
     return ListView(
+      controller: _scroll,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
+        _note(context),
         if (favorites.isNotEmpty) ...[
           const _SectionHeader('Favorites'),
           for (final hall in favorites) _HallCard(hall: hall),
@@ -120,9 +119,19 @@ class _HallsScreenState extends State<HallsScreen> {
     );
   }
 
+  Widget _note(BuildContext context) {
+    final state = context.read<HallsController>().state;
+    if (!state.isOffline) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+      child: OfflineNote(state: state, what: 'hours'),
+    );
+  }
+
   /// Keeps pull-to-refresh working when the content doesn't scroll.
   Widget _scrollable(Widget child) => LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
+          controller: _scroll,
           physics: const AlwaysScrollableScrollPhysics(),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
