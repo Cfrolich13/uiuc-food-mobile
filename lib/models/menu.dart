@@ -4,8 +4,10 @@ enum DietaryTag {
   vegetarian('Vegetarian', 'V'),
   glutenFree('Gluten-free', 'GF'),
   halal('Halal', 'H'),
+  kosher('Kosher', 'K'),
   containsNuts('Contains nuts', 'N'),
-  containsDairy('Contains dairy', 'D');
+  containsDairy('Contains dairy', 'D'),
+  containsGluten('Contains gluten', 'G');
 
   const DietaryTag(this.label, this.abbreviation);
 
@@ -13,7 +15,7 @@ enum DietaryTag {
   final String abbreviation;
 
   /// Tags a user can filter *for* (the rest are allergen warnings).
-  static const preferences = [vegan, vegetarian, glutenFree, halal];
+  static const preferences = [vegan, vegetarian, glutenFree, halal, kosher];
 
   static DietaryTag? fromJson(String value) {
     for (final tag in values) {

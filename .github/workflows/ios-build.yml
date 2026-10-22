@@ -4,6 +4,10 @@ on:
   push:
   workflow_dispatch:
     inputs:
+      illinois_dining_url:
+        description: "Optional ILLINOIS_DINING_URL (University Housing feed). Overrides the ILLINOIS_DINING_URL repo variable."
+        required: false
+        default: ""
       api_base_url:
         description: "Optional DINING_API_BASE_URL. Leave empty to build with sample data."
         required: false
@@ -45,9 +49,14 @@ jobs:
 
       - name: Build iOS app (no code signing)
         env:
+          # Pushes use the repository variable; manual runs can override it.
+          ILLINOIS_DINING_URL: ${{ inputs.illinois_dining_url || vars.ILLINOIS_DINING_URL }}
           API_BASE_URL: ${{ inputs.api_base_url }}
         run: |
           args=(--release --no-codesign --build-number="$GITHUB_RUN_NUMBER")
+          if [ -n "$ILLINOIS_DINING_URL" ]; then
+            args+=(--dart-define=ILLINOIS_DINING_URL="$ILLINOIS_DINING_URL")
+          fi
           if [ -n "$API_BASE_URL" ]; then
             args+=(--dart-define=DINING_API_BASE_URL="$API_BASE_URL")
           fi

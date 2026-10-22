@@ -83,9 +83,42 @@ place, so a crash can't leave a half-written menu behind.
 
 ## Connecting real data
 
-The Illinois app's dining menus and balances sit behind University systems: balances need a NetID
-sign-in through University SSO. Rather than hard-code private endpoints, the app talks to a small
-JSON API you can host, for example as a proxy in front of the University services:
+### University Housing menus (no sign-in)
+
+The official Illinois app ([rokwire/illinois-app](https://github.com/rokwire/illinois-app)) loads
+dining locations, hours and menus from a University Housing feed, without signing in.
+`IllinoisDiningApi` reads that same feed:
+
+| Endpoint | Response |
+| --- | --- |
+| `GET {base}/LocationSchedules` | `{"DiningOptions": [{DiningOptionID, DiningOptionName, Type, Address, Lat, Long, DiningSchedules: [{TimePeriod, StartTimeUTC, EndTimeUTC, …}]}]}` |
+| `GET {base}/Menu/{DiningOptionID}/{M-d-yyyy}` | `[{ItemID, FormalName, Meal, Course, CourseSort, Traits, …}]` |
+
+The field names come from the official app's parsers (`lib/model/Dining.dart`). The official app
+doesn't hard-code the base URL; it receives it at runtime as `illini_cash_base_url` from its remote
+config. Pass that URL in:
+
+```sh
+flutter run --dart-define=ILLINOIS_DINING_URL=https://…
+```
+
+For CI builds, set it as the `ILLINOIS_DINING_URL` repository variable (Settings → Secrets and
+variables → Actions → Variables) or enter it when running the workflow manually.
+
+`Traits` mixes diet types (Vegan, Vegetarian, Halal, Kosher) with ingredients an item contains
+(Gluten, Milk, Peanuts…). The app shows diet types as filters and ingredients as allergen badges.
+It never infers "gluten-free" from an ingredient being absent.
+
+### Meal plan balances
+
+Balances come from the same host, but they require the student's UIN and a University sign-in
+token. This app doesn't implement University SSO, so balances stay sample data unless you supply
+your own backend.
+
+### Custom backend
+
+The app can also talk to a small JSON API you host, for example a proxy in front of University
+services:
 
 ```sh
 flutter run \
@@ -102,7 +135,10 @@ flutter run \
 The JSON shapes are the `toJson()` methods in `lib/models/`. For example, a menu item is
 `{"name": "Chana Masala", "tags": ["vegan", "glutenFree"], "calories": 310}`. Hours are
 `{"meal": "Lunch", "weekdays": [1,2,3,4,5], "opens": "10:30", "closes": "14:00"}`, with ISO
-weekdays (Monday = 1).
+weekdays (Monday = 1). When both are set, `ILLINOIS_DINING_URL` supplies menus and the custom
+backend supplies balances.
 
-Sample venue names and addresses reflect University Housing dining. Their hours, menus and
-balances are illustrative only.
+### Sample data
+
+With nothing configured, the app uses built-in sample data. Venue names and addresses reflect
+University Housing dining; hours, menus and balances are illustrative only.

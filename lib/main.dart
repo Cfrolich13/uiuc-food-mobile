@@ -9,6 +9,7 @@ import 'config.dart';
 import 'data/demo_dining_api.dart';
 import 'data/dining_api.dart';
 import 'data/dining_repository.dart';
+import 'data/illinois_dining_api.dart';
 import 'data/local_cache.dart';
 
 Future<void> main() async {
@@ -18,20 +19,24 @@ Future<void> main() async {
   final supportDir = await getApplicationSupportDirectory();
   final cache = FileCache(Directory('${supportDir.path}/dining_cache'));
 
-  final demoApi = AppConfig.useDemoData ? DemoDiningApi() : null;
-  final httpApi = demoApi == null
-      ? HttpDiningApi(baseUrl: AppConfig.apiBaseUrl, authToken: AppConfig.apiToken)
-      : null;
+  final demoApi = DemoDiningApi();
+  final customApi = AppConfig.apiBaseUrl.isEmpty
+      ? null
+      : HttpDiningApi(baseUrl: AppConfig.apiBaseUrl, authToken: AppConfig.apiToken);
+  final illinoisApi = AppConfig.illinoisDiningUrl.isEmpty
+      ? null
+      : IllinoisDiningApi(baseUrl: AppConfig.illinoisDiningUrl);
 
   final repository = DiningRepository(
-    diningApi: demoApi ?? httpApi!,
-    balanceApi: demoApi ?? httpApi!,
+    diningApi: illinoisApi ?? customApi ?? demoApi,
+    balanceApi: customApi ?? demoApi,
     cache: cache,
   );
 
   runApp(IlliniDiningApp(
     repository: repository,
     preferences: preferences,
-    demoApi: demoApi,
+    // The "simulate offline" switch only makes sense with sample menus.
+    demoApi: AppConfig.useSampleMenus ? demoApi : null,
   ));
 }

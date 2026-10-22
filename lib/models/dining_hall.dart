@@ -59,6 +59,30 @@ class ServiceHours {
       '${(minutes % 60).toString().padLeft(2, '0')}';
 }
 
+/// One dated meal service, e.g. "Lunch on Oct 22, 10:30–14:00".
+///
+/// The University's schedule feed publishes these individually for the next
+/// couple of weeks rather than as a weekly pattern.
+class ServiceSession {
+  const ServiceSession({required this.meal, required this.start, required this.end});
+
+  final String meal;
+  final DateTime start;
+  final DateTime end;
+
+  factory ServiceSession.fromJson(Map<String, dynamic> json) => ServiceSession(
+        meal: json['meal'] as String,
+        start: DateTime.parse(json['start'] as String),
+        end: DateTime.parse(json['end'] as String),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'meal': meal,
+        'start': start.toUtc().toIso8601String(),
+        'end': end.toUtc().toIso8601String(),
+      };
+}
+
 /// Open/closed state of a venue at a point in time.
 class OpenStatus {
   const OpenStatus({required this.isOpen, this.currentMeal, this.nextChange, this.nextMeal});
@@ -83,6 +107,7 @@ class DiningHall {
     required this.address,
     required this.type,
     required this.hours,
+    this.sessions,
     this.latitude,
     this.longitude,
     this.description,
@@ -94,14 +119,42 @@ class DiningHall {
   final String address;
   final VenueType type;
   final List<ServiceHours> hours;
+
+  /// Dated services. When present, these replace the weekly [hours].
+  final List<ServiceSession>? sessions;
   final double? latitude;
   final double? longitude;
   final String? description;
 
   /// Service windows that apply on [day], ordered by opening time.
-  List<ServiceHours> hoursOn(DateTime day) =>
-      hours.where((h) => h.appliesOn(day)).toList()
-        ..sort((a, b) => a.opensAt.compareTo(b.opensAt));
+  List<ServiceHours> hoursOn(DateTime day) {
+    final sessions = this.sessions;
+    final List<ServiceHours> result;
+    if (sessions != null) {
+      result = [
+        for (final s in sessions)
+          if (_sameDay(s.start.toLocal(), day)) _sessionHours(s, day),
+      ];
+    } else {
+      result = hours.where((h) => h.appliesOn(day)).toList();
+    }
+    return result..sort((a, b) => a.opensAt.compareTo(b.opensAt));
+  }
+
+  static ServiceHours _sessionHours(ServiceSession s, DateTime day) {
+    final start = s.start.toLocal();
+    final end = s.end.toLocal();
+    return ServiceHours(
+      meal: s.meal,
+      weekdays: {day.weekday},
+      opensAt: start.hour * 60 + start.minute,
+      // A service ending after midnight is shown as running until midnight.
+      closesAt: _sameDay(end, day) ? end.hour * 60 + end.minute : 24 * 60,
+    );
+  }
+
+  static bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
   OpenStatus statusAt(DateTime now) {
     for (final h in hoursOn(now)) {
@@ -145,6 +198,9 @@ class DiningHall {
         hours: ((json['hours'] ?? const []) as List)
             .map((h) => ServiceHours.fromJson(h as Map<String, dynamic>))
             .toList(),
+        sessions: (json['sessions'] as List?)
+            ?.map((s) => ServiceSession.fromJson(s as Map<String, dynamic>))
+            .toList(),
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         description: json['description'] as String?,
@@ -157,6 +213,7 @@ class DiningHall {
         'address': address,
         'type': type.name,
         'hours': hours.map((h) => h.toJson()).toList(),
+        if (sessions != null) 'sessions': sessions!.map((s) => s.toJson()).toList(),
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
         if (description != null) 'description': description,

@@ -149,9 +149,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.info_outline_rounded),
             title: const Text('Illini Dining'),
-            subtitle: Text(AppConfig.useDemoData
-                ? 'Using sample menus and balances. Not an official University of Illinois app.'
-                : 'Not an official University of Illinois app.'),
+            subtitle: Text([
+              if (AppConfig.illinoisDiningUrl.isNotEmpty)
+                'Menus and hours from University Housing.'
+              else if (AppConfig.useSampleMenus)
+                'Using sample menus.',
+              if (AppConfig.useSampleBalances) 'Balances are sample data.',
+              'Not an official University of Illinois app.',
+            ].join(' ')),
           ),
         ],
       ),

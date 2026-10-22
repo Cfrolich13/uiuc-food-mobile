@@ -67,7 +67,7 @@ class BalancesScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     _DiningDollarsCard(balance: balance),
                     const SizedBox(height: 24),
-                    if (AppConfig.useDemoData)
+                    if (AppConfig.useSampleBalances)
                       const _InfoNote(
                         'Sample balances. Signing in with your NetID requires '
                         'University SSO, which this build does not include.',

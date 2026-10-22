@@ -78,7 +78,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
               if (state.refreshing) const LinearProgressIndicator(minHeight: 2),
               OfflineBanner(state: state, what: 'menu', onRetry: () => _menu.loadDay(_day)),
               _DayPicker(today: _today, selected: _day, onSelected: _selectDay),
-              const _DietaryFilterBar(),
+              _DietaryFilterBar(menu: state.data),
               Expanded(child: _content(context, hall, state)),
             ],
           );
@@ -194,20 +194,33 @@ class _DayPicker extends StatelessWidget {
 }
 
 class _DietaryFilterBar extends StatelessWidget {
-  const _DietaryFilterBar();
+  const _DietaryFilterBar({required this.menu});
+
+  final DailyMenu? menu;
 
   @override
   Widget build(BuildContext context) {
     final prefs = context.watch<UserPrefs>();
+    // Offer only diets this menu actually labels, plus any already selected.
+    final present = menu?.meals
+        .expand((m) => m.stations)
+        .expand((s) => s.items)
+        .expand((i) => i.tags)
+        .toSet();
+    final tags = [
+      for (final tag in DietaryTag.preferences)
+        if (present == null || present.contains(tag) || prefs.dietaryFilters.contains(tag)) tag,
+    ];
+    if (tags.isEmpty) return const SizedBox.shrink();
     return SizedBox(
       height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-        itemCount: DietaryTag.preferences.length,
+        itemCount: tags.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final tag = DietaryTag.preferences[i];
+          final tag = tags[i];
           return FilterChip(
             label: Text(tag.label),
             selected: prefs.dietaryFilters.contains(tag),
@@ -271,7 +284,8 @@ class _MealView extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 12),
             child: _StationCard(name: station.name, items: items),
           ),
-        if (stations.isNotEmpty) const _Legend(),
+        if (stations.isNotEmpty)
+          _Legend(tags: stations.expand((s) => s.$2).expand((i) => i.tags).toSet()),
       ],
     );
   }
@@ -332,7 +346,9 @@ class _StationCard extends StatelessWidget {
 }
 
 class _Legend extends StatelessWidget {
-  const _Legend();
+  const _Legend({required this.tags});
+
+  final Set<DietaryTag> tags;
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +360,7 @@ class _Legend extends StatelessWidget {
         spacing: 12,
         runSpacing: 6,
         children: [
-          for (final tag in DietaryTag.values)
+          for (final tag in DietaryTag.values.where(tags.contains))
             Row(mainAxisSize: MainAxisSize.min, children: [
               DietaryBadge(tag),
               const SizedBox(width: 4),
