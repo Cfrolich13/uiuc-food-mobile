@@ -44,7 +44,8 @@ flutter analyze
 ### iOS builds (CI)
 
 `.github/workflows/ios-build.yml` builds an **unsigned** `.ipa` on every push. It runs analyze and
-tests first, then uploads the `.ipa` as a workflow artifact, kept for 30 days. To run it by hand,
+tests first, then uploads the `.ipa` as a workflow artifact, kept for 30 days. The download is
+the `.ipa` itself, not a zip. To run it by hand,
 go to **Actions → iOS build → Run workflow**. You can optionally give a `DINING_API_BASE_URL` to
 build against a real backend. Sign the `.ipa` yourself before installing it, for example with
 Sideloadly, AltStore or `codesign`.
