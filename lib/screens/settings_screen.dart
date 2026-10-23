@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../config.dart';
 import '../data/demo_dining_api.dart';
 import '../data/dining_repository.dart';
+import '../data/sign_in_log.dart';
 import '../state/controllers.dart';
 import '../widgets/formatting.dart';
+import 'sign_in_diagnostics_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -86,6 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final halls = context.watch<HallsController>();
     final demoApi = context.watch<DemoDiningApi?>();
+    final signInLog = context.read<SignInLog?>();
     final brightness = MediaQuery.platformBrightnessOf(context);
     final now = context.read<Clock>().now();
     final theme = Theme.of(context);
@@ -143,6 +146,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: const Text('Try the app with poor connectivity to see saved menus.'),
               value: demoApi.offline,
               onChanged: (value) => setState(() => demoApi.offline = value),
+            ),
+          ],
+          if (signInLog != null) ...[
+            const _Header('Meal plan'),
+            ListTile(
+              leading: const Icon(Icons.manage_search_rounded),
+              title: const Text('Sign-in diagnostics'),
+              subtitle: const Text('What happened during recent University sign-ins'),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => SignInDiagnosticsScreen(log: signInLog))),
             ),
           ],
           const _Header('About'),

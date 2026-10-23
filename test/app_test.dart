@@ -13,6 +13,7 @@ import 'package:illini_dining/data/dining_repository.dart';
 import 'package:illini_dining/data/housing_balance_api.dart';
 import 'package:illini_dining/data/illinois_dining_api.dart';
 import 'package:illini_dining/data/local_cache.dart';
+import 'package:illini_dining/data/sign_in_log.dart';
 import 'package:illini_dining/models/menu.dart';
 import 'package:illini_dining/screens/halls_screen.dart';
 import 'package:illini_dining/state/controllers.dart';
@@ -323,6 +324,47 @@ void main() {
     expect(source.signedOut, isTrue);
     expect(find.text('Sign in with NetID'), findsOneWidget);
     expect(find.text(r'$43.50'), findsNothing);
+  });
+
+  testWidgets('settings opens sign-in diagnostics', (tester) async {
+    final prefs = await SharedPreferences.getInstance();
+    var now = DateTime(2026, 10, 23, 14, 5);
+    final log = SignInLog(prefs, now: () => now);
+    final refresh = log.start('Background refresh');
+    refresh.navigation('https://web.housing.illinois.edu/MyHousing/MealPlanBalances', allowed: true);
+    now = now.add(const Duration(seconds: 2));
+    refresh.pageLoaded('https://login.microsoftonline.com/44467e6f-462c-4ea2-823f-7800de5434e3/'
+        'saml2?SAMLRequest=abc');
+    // Finishing asks the (absent) native side for cookies, outside fake time.
+    await tester.runAsync(() => refresh.finish('needs sign-in: still on login.microsoftonline.com/'
+        '44467e6f-462c-4ea2-823f-7800de5434e3/saml2 after 6 s'));
+
+    final harness = _Harness();
+    await tester.binding.setSurfaceSize(const Size(430, 932));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(IlliniDiningApp(
+      repository: harness.repository,
+      preferences: prefs,
+      clock: Clock(() => _now),
+      signInLog: log,
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Sign-in diagnostics'), 100,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text('Sign-in diagnostics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Background refresh · Oct 23, 2:05:00 PM'), findsOneWidget);
+    expect(find.textContaining('needs sign-in: still on login.microsoftonline.com'), findsOneWidget);
+    expect(find.text('+2.0s loaded login.microsoftonline.com/'
+        '44467e6f-462c-4ea2-823f-7800de5434e3/saml2'), findsOneWidget);
+    _expectNoEllipsis(tester);
+
+    await tester.tap(find.byTooltip('Clear'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing recorded yet.'), findsOneWidget);
   });
 
   testWidgets('dining tab shows a compact balance that opens Balances', (tester) async {

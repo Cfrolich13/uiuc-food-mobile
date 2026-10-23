@@ -167,9 +167,10 @@ from its own registered sign-in, which other apps can't use. Instead, this app r
 page students see in a browser:
 [MyHousing → Meal Plan Balances](https://web.housing.illinois.edu/MyHousing/MealPlanBalances).
 
-- **Sign-in:** *Sign in with NetID* opens that page in a WebView. The University redirects to its
-  normal sign-in, now primarily Microsoft (`login.microsoftonline.com`, `login.microsoft.com`),
-  with `shibboleth.illinois.edu` and Duo still involved for some sign-ins. The student signs in
+- **Sign-in:** *Sign in with NetID* opens that page in a WebView. Housing hands the sign-in to
+  the University's Shibboleth server (`shibboleth.illinois.edu`), which sends it on to Microsoft
+  (`login.microsoftonline.com`, `login.microsoft.com`), with Duo still involved for some
+  sign-ins. The student signs in
   there; the password goes to the University, and the app never sees it. The top-level page can
   only be an `illinois.edu`, Microsoft sign-in or Duo address (frames inside those pages aren't
   restricted).
@@ -193,13 +194,24 @@ page students see in a browser:
   quits, unlike Safari. `SessionCookieKeeper` in `ios/Runner/AppDelegate.swift` saves the
   sign-in cookies for `illinois.edu`, Microsoft sign-in and Duo hosts to the Keychain (this device
   only, not backed up) whenever they change, and restores them once per launch before the first
-  page loads. Each site still decides how long its session lasts. Answering **Yes** to
-  Microsoft's "Stay signed in?" gives the longest-lived sign-in.
+  page loads. The snapshot is also saved when the app goes to the background, with time
+  requested from iOS to finish. Each site still decides how long its session lasts.
+- **How long it lasts:** Housing's own session seems to end after under an hour without a visit
+  (Shibboleth's default idle timeout is an hour). Getting back in goes through Microsoft, which asks for the password again
+  unless its sign-in is still alive, and even then shows the account to tap. Microsoft doesn't
+  offer "Stay signed in?" on the University's sign-in, so its sign-in only lasts a browser
+  session. So while the app is open, `BalanceController` visits Housing every 30 minutes, and on
+  returning to the app if it's been that long, which keeps Housing's session going.
 - **Refreshing:** later refreshes load the page in an off-screen WebView that shares the sign-in
   cookies. If the University asks for a sign-in again, the app keeps the saved numbers and offers
-  *Sign in again*. Nothing is requested from the University until the student has signed in once,
-  and *Sign out of University Housing* clears the cookies, the Keychain copy and the saved
-  balances.
+  *Sign in again*; tapping the balance strip on the Dining tab then goes straight to the sign-in.
+  Nothing is requested from the University until the student has signed in once, and *Sign out
+  of University Housing* clears the cookies, the Keychain copy and the saved balances.
+- **Diagnostics:** *Settings → Sign-in diagnostics* lists recent sign-ins and refreshes: the
+  pages each went through (addresses without their query, which can carry sign-in tokens), where
+  it stopped, and the names and lifetimes of the sign-in cookies afterwards (never their values),
+  plus, on iOS, the Keychain snapshot. *Copy report* gives it as text. It's stored on the device
+  only (`SignInLog`, `lib/data/sign_in_log.dart`).
 
 `test/fixtures/meal_plan_balances.html` is the balance section of the real page; if Housing
 changes the page and balances stop appearing, update the fixture and the parser together.

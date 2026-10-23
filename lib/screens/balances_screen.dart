@@ -12,13 +12,6 @@ import 'housing_sign_in_screen.dart';
 class BalancesScreen extends StatelessWidget {
   const BalancesScreen({super.key});
 
-  static Future<void> _signIn(BuildContext context) async {
-    final controller = context.read<BalanceController>();
-    final balance = await Navigator.of(context)
-        .push<MealPlanBalance>(MaterialPageRoute(builder: (_) => const HousingSignInScreen()));
-    if (balance != null) await controller.acceptSignIn(balance);
-  }
-
   static Future<void> _signOut(BuildContext context) async {
     final controller = context.read<BalanceController>();
     final confirmed = await showDialog<bool>(
@@ -63,7 +56,7 @@ class BalancesScreen extends StatelessWidget {
               'remaining meals and Dining Dollars here. Your password goes to the '
               'University, not to this app.',
           action: FilledButton.icon(
-            onPressed: () => _signIn(context),
+            onPressed: () => signInToHousing(context),
             icon: const Icon(Icons.login_rounded),
             label: const Text('Sign in with NetID'),
           ),
@@ -89,7 +82,7 @@ class BalancesScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: FilledButton.tonalIcon(
-              onPressed: () => _signIn(context),
+              onPressed: () => signInToHousing(context),
               icon: const Icon(Icons.login_rounded),
               label: const Text('Sign in again to update'),
             ),

@@ -77,4 +77,7 @@ Decided against for now. If revisited, host on the owner's `web.illinois.edu` si
   whether the feed is reachable.
 - **The MyHousing balances page.** Balances are read from its visible text; if Housing changes
   the labels, update `test/fixtures/meal_plan_balances.html` and `parseBalancesPage` together.
-- **How long the sign-in lasts** with saved session cookies, in practice.
+- **How long the sign-in lasts** in practice. Housing seems to end its session after under an hour idle,
+  and re-signing in has asked for the Microsoft password each time, while Safari only needs a
+  tap on the account. Use Settings → Sign-in diagnostics on a phone to see whether Microsoft's
+  `ESTSAUTH` cookie survives (live and in the iOS Keychain snapshot) and where refreshes stop.

@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'dining_api.dart';
 import 'housing_balance_api.dart';
 import 'session_cookies.dart';
+import 'sign_in_log.dart';
 
 /// Hosts the University sign-in flow may show as the page: University sites
 /// (including shibboleth.illinois.edu), Microsoft (the University's primary
@@ -51,7 +52,7 @@ Future<String> readPageText(WebViewController controller) async {
 /// Loads the balances page in an off-screen WebView that shares cookies with
 /// the sign-in screen, so it uses the student's own University session.
 class WebViewBalancePageSource implements BalancePageSource {
-  WebViewBalancePageSource(this._prefs);
+  WebViewBalancePageSource(this._prefs, {this.log});
 
   static const _signedInKey = 'housing_signed_in';
 
@@ -61,6 +62,9 @@ class WebViewBalancePageSource implements BalancePageSource {
   static const _timeout = Duration(seconds: 25);
 
   final SharedPreferences _prefs;
+
+  /// Records each refresh for the sign-in diagnostics screen.
+  final SignInLog? log;
   WebViewController? _controller;
   Future<String>? _inFlight;
 
@@ -81,8 +85,10 @@ class WebViewBalancePageSource implements BalancePageSource {
   }
 
   Future<String> _load() async {
+    final record = log?.start('Background refresh');
     // Bring back the sign-in from an earlier launch before visiting Housing.
-    await SessionCookies.restore();
+    final restored = await SessionCookies.restore();
+    if (restored > 0) record?.note('restored $restored saved sign-in cookies');
     final controller = _controller ??= WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted);
     final done = Completer<String>();
@@ -92,8 +98,15 @@ class WebViewBalancePageSource implements BalancePageSource {
     }
 
     await controller.setNavigationDelegate(NavigationDelegate(
-      onNavigationRequest: decideSignInNavigation,
+      onNavigationRequest: (request) {
+        final decision = decideSignInNavigation(request);
+        if (request.isMainFrame) {
+          record?.navigation(request.url, allowed: decision == NavigationDecision.navigate);
+        }
+        return decision;
+      },
       onPageFinished: (url) async {
+        record?.pageLoaded(url);
         final uri = Uri.tryParse(url);
         if (uri == null) return;
         grace?.cancel();
@@ -118,10 +131,17 @@ class WebViewBalancePageSource implements BalancePageSource {
     ));
     await controller.loadRequest(Uri.parse(HousingBalanceApi.balancesUrl));
     try {
-      return await done.future.timeout(
+      final text = await done.future.timeout(
         _timeout,
         onTimeout: () => throw const DiningApiException('University Housing timed out'),
       );
+      record?.finish('read the balances page');
+      return text;
+    } catch (e) {
+      record?.finish(e is SignInRequired
+          ? 'needs sign-in: still on ${record.lastPage} after ${_signInGrace.inSeconds} s'
+          : '$e');
+      rethrow;
     } finally {
       grace?.cancel();
     }

@@ -81,8 +81,16 @@ text and `parseBalancesPage` extracts the four labelled tiles. Rules to keep:
 - Staying signed in uses the `illini_dining/session_cookies` channel
   (`lib/data/session_cookies.dart`: `restore`, `save`, `clear`). On iOS, WKWebView drops session
   cookies on quit, so `SessionCookieKeeper` (`ios/Runner/AppDelegate.swift`) snapshots sign-in
-  cookies to the Keychain and restores them once per launch. Android's WebView persists session
-  cookies itself; `MainActivity.kt` only flushes them. In tests the channel is absent (no-op).
+  cookies to the Keychain and restores them once per launch (`restore` returns the count).
+  Android's WebView persists session cookies itself; `MainActivity.kt` only flushes them. In
+  tests the channel is absent (no-op).
+- Housing's session seems to end after under an hour idle (Shibboleth's default is an hour) and
+  Microsoft never offers "Stay signed in?" on this flow, so `BalanceController` revisits Housing
+  every 30 minutes while the app is open. A background refresh can't get past Microsoft's account picker, and must not
+  try (no scripts on sign-in pages).
+- `SignInLog` (Settings → Sign-in diagnostics) records each sign-in and refresh: URLs without
+  their query, and cookie names and lifetimes via the channel's `describe`. Never record cookie
+  values, page text or query strings.
 - Microsoft passkeys can't work in an embedded WebView on either platform (only the app's own
   domain); students use "Other ways to sign in".
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../screens/home_shell.dart';
+import '../screens/housing_sign_in_screen.dart';
 import '../state/controllers.dart';
 import '../theme/app_theme.dart';
 import 'formatting.dart';
@@ -10,7 +11,9 @@ import 'formatting.dart';
 /// Dining Dollars left. Tapping it opens the Balances tab.
 ///
 /// Shows a sign-in prompt if balances need a NetID sign-in, and nothing while
-/// balances are still loading or unavailable.
+/// balances are still loading or unavailable. Once the University has ended
+/// the sign-in, tapping saved balances goes straight to the sign-in, where a
+/// student still signed in to Microsoft only taps their account.
 class BalanceStrip extends StatelessWidget {
   const BalanceStrip({super.key});
 
@@ -42,10 +45,10 @@ class BalanceStrip extends StatelessWidget {
     final meals = balance.mealSwipesRemaining;
     final dollars = formatCurrency(balance.diningDollars);
     return _StripCard(
-      onTap: open,
+      onTap: controller.needsSignIn ? () => signInToHousing(context) : open,
       semanticsLabel: 'Meal plan: $meals ${meals == 1 ? 'meal' : 'meals'} left, '
-          '$dollars Dining Dollars${controller.needsSignIn ? ', sign-in expired' : ''}. '
-          'Opens balances.',
+          '$dollars Dining Dollars. '
+          '${controller.needsSignIn ? 'Sign-in expired; opens University sign-in.' : 'Opens balances.'}',
       child: Row(children: [
         Expanded(
           child: _Stat(

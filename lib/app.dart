@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/demo_dining_api.dart';
 import 'data/dining_repository.dart';
+import 'data/sign_in_log.dart';
 import 'screens/home_shell.dart';
 import 'state/controllers.dart';
 import 'state/reconnector.dart';
@@ -20,6 +21,7 @@ class IlliniDiningApp extends StatelessWidget {
     this.clock = const Clock(),
     this.connectivityChanges,
     this.onBalanceSignIn,
+    this.signInLog,
   });
 
   final DiningRepository repository;
@@ -36,6 +38,9 @@ class IlliniDiningApp extends StatelessWidget {
   /// Called after the student signs in to University Housing for balances.
   final Future<void> Function()? onBalanceSignIn;
 
+  /// Recent University sign-in attempts, for the diagnostics screen.
+  final SignInLog? signInLog;
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -43,6 +48,7 @@ class IlliniDiningApp extends StatelessWidget {
         Provider.value(value: clock),
         Provider.value(value: repository),
         Provider<DemoDiningApi?>.value(value: demoApi),
+        ChangeNotifierProvider<SignInLog?>.value(value: signInLog),
         ChangeNotifierProvider(create: (_) => UserPrefs(preferences)),
         ChangeNotifierProvider(
           create: (context) =>

@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
+
 import '../config.dart';
 import '../data/dining_repository.dart';
 import '../data/housing_balance_api.dart';
@@ -100,10 +104,27 @@ class HallsController extends Loader<List<DiningHall>> {
   }
 }
 
-class BalanceController extends Loader<MealPlanBalance> {
-  BalanceController(this.repository, {this.onSignedIn}) : super(network: repository.network);
+/// Meal plan balances. With the University sign-in, also keeps University
+/// Housing's session alive while the app is open.
+class BalanceController extends Loader<MealPlanBalance> with WidgetsBindingObserver {
+  BalanceController(this.repository, {this.onSignedIn, DateTime Function()? now})
+      : _now = now ?? DateTime.now,
+        super(network: repository.network) {
+    if (usesUniversitySignIn) WidgetsBinding.instance.addObserver(this);
+  }
 
   final DiningRepository repository;
+
+  /// University Housing seems to end its sign-in after under an hour without a
+  /// visit (Shibboleth's default is an hour), and getting back in can take a tap on the
+  /// Microsoft page, which a background refresh can't do. So while the app is
+  /// open, visit more often than that.
+  static const keepAliveInterval = Duration(minutes: 30);
+
+  /// Device time, only for measuring time since the last visit.
+  final DateTime Function() _now;
+  DateTime? _lastVisit;
+  Timer? _keepAlive;
 
   /// Called after a successful University sign-in, so the source can start
   /// refreshing in the background.
@@ -123,6 +144,39 @@ class BalanceController extends Loader<MealPlanBalance> {
     if (!needsSignIn) await refresh();
   }
 
+  @override
+  void onLoaded(Loaded<MealPlanBalance> value) {
+    if (value.error != null || !usesUniversitySignIn) return;
+    _lastVisit = _now();
+    _scheduleKeepAlive(keepAliveInterval);
+  }
+
+  void _scheduleKeepAlive(Duration delay) {
+    _keepAlive?.cancel();
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
+    _keepAlive = Timer(delay, retry);
+  }
+
+  /// No timers in the background. Back in the foreground, refresh if the
+  /// last visit was [keepAliveInterval] or more ago: balances may have
+  /// changed, and if Housing's session is still alive this renews it.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _keepAlive?.cancel();
+      return;
+    }
+    final last = _lastVisit;
+    if (last == null || needsSignIn || this.state.refreshing) return;
+    final since = _now().difference(last);
+    if (since >= keepAliveInterval) {
+      retry();
+    } else {
+      _scheduleKeepAlive(keepAliveInterval - since);
+    }
+  }
+
   /// Shows balances read by the sign-in screen and keeps them for offline use.
   Future<void> acceptSignIn(MealPlanBalance balance) async {
     await onSignedIn?.call();
@@ -135,8 +189,17 @@ class BalanceController extends Loader<MealPlanBalance> {
     final api = repository.balanceApi;
     if (api is HousingBalanceApi) await api.source.signOut();
     await repository.clearBalance();
+    _keepAlive?.cancel();
+    _lastVisit = null;
     reset();
     await load(Stream.value(const Loaded(error: SignInRequired())));
+  }
+
+  @override
+  void dispose() {
+    _keepAlive?.cancel();
+    if (usesUniversitySignIn) WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 }
 

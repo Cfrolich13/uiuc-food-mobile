@@ -1,5 +1,6 @@
 package edu.illinois.illini_dining
 
+import android.net.Uri
 import android.webkit.CookieManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -22,9 +23,26 @@ class MainActivity : FlutterActivity() {
                         CookieManager.getInstance().flush()
                         result.success(null)
                     }
+                    "describe" -> result.success(mapOf("cookies" to describeSignInCookies()))
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /**
+     * Names of the cookies the WebView would send to each sign-in site, for the
+     * app's sign-in diagnostics screen. Android's CookieManager only gives
+     * name=value pairs, so lifetimes are unknown, and values are dropped here.
+     */
+    private fun describeSignInCookies(): List<Map<String, String>> {
+        val manager = CookieManager.getInstance()
+        return signInPages.flatMap { url ->
+            val host = Uri.parse(url).host ?: return@flatMap emptyList()
+            (manager.getCookie(url) ?: "").split(";")
+                .map { it.substringBefore("=").trim() }
+                .filter { it.isNotEmpty() }
+                .map { mapOf("name" to it, "host" to host) }
+        }
     }
 
     override fun onPause() {
@@ -32,3 +50,10 @@ class MainActivity : FlutterActivity() {
         CookieManager.getInstance().flush()
     }
 }
+
+private val signInPages = listOf(
+    "https://web.housing.illinois.edu/MyHousing/",
+    "https://shibboleth.illinois.edu/idp/",
+    "https://login.microsoftonline.com/",
+    "https://login.microsoft.com/",
+)

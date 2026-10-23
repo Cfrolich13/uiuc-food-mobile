@@ -35,16 +35,18 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
 
   private let keychainService = "edu.illinois.illiniDining.signInCookies"
   private let keychainAccount = "cookies"
+  private let savedAtKey = "signInCookiesSavedAt"
   private var store: WKHTTPCookieStore { WKWebsiteDataStore.default().httpCookieStore }
   private var pendingSave: DispatchWorkItem?
   private var restoring = false
   private var restored = false
+  private var restoredCount = 0
   private var restoreWaiters: [(Int) -> Void] = []
 
   func start() {
     store.add(self)
     NotificationCenter.default.addObserver(
-      self, selector: #selector(saveNow),
+      self, selector: #selector(saveBeforeSuspending),
       name: UIApplication.didEnterBackgroundNotification, object: nil)
   }
 
@@ -62,6 +64,8 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
       case "clear":
         self.deleteSnapshot()
         result(nil)
+      case "describe":
+        self.describe { result($0) }
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -86,10 +90,27 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
     DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
   }
 
-  @objc func saveNow() {
+  /// Reading the cookie store is asynchronous, so ask iOS for time to finish
+  /// the save before the app is suspended.
+  @objc private func saveBeforeSuspending() {
+    var task = UIBackgroundTaskIdentifier.invalid
+    let finish = {
+      guard task != .invalid else { return }
+      UIApplication.shared.endBackgroundTask(task)
+      task = .invalid
+    }
+    task = UIApplication.shared.beginBackgroundTask(expirationHandler: finish)
+    saveNow(completion: finish)
+  }
+
+  func saveNow(completion: (() -> Void)? = nil) {
     // Don't overwrite the snapshot with an empty store before it's restored.
-    guard restored else { return }
+    guard restored else {
+      completion?()
+      return
+    }
     store.getAllCookies { [weak self] cookies in
+      defer { completion?() }
       guard let self = self else { return }
       let now = Date()
       let kept = cookies.filter {
@@ -158,11 +179,45 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
       guard let self = self else { return }
       self.restoring = false
       self.restored = true
+      self.restoredCount = cookies.count
       let waiters = self.restoreWaiters
       self.restoreWaiters = []
       waiters.forEach { $0(cookies.count) }
     }
   }
+
+  // MARK: Diagnostics
+
+  /// Names and lifetimes of the sign-in cookies, never their values, for the
+  /// app's sign-in diagnostics screen.
+  func describe(completion: @escaping ([String: Any]) -> Void) {
+    store.getAllCookies { [weak self] cookies in
+      guard let self = self else { return completion([:]) }
+      let live: [[String: Any]] = cookies.filter { Self.isSignInDomain($0.domain) }.map { cookie in
+        var entry: [String: Any] = [
+          "name": cookie.name, "host": cookie.domain, "session": cookie.isSessionOnly,
+        ]
+        if let expires = cookie.expiresDate { entry["expires"] = Self.millis(expires) }
+        return entry
+      }
+      var report: [String: Any] = ["cookies": live]
+      if let data = self.readSnapshot(),
+        let plist = try? PropertyListSerialization.propertyList(from: data, format: nil)
+          as? [[String: Any]]
+      {
+        report["savedCount"] = plist.count
+      } else {
+        report["savedCount"] = 0
+      }
+      if let savedAt = UserDefaults.standard.object(forKey: self.savedAtKey) as? Date {
+        report["savedAt"] = Self.millis(savedAt)
+      }
+      if self.restored { report["restoredAtLaunch"] = self.restoredCount }
+      completion(report)
+    }
+  }
+
+  private static func millis(_ date: Date) -> Int { Int(date.timeIntervalSince1970 * 1000) }
 
   // MARK: Keychain
 
@@ -191,9 +246,11 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
     if status == errSecItemNotFound {
       SecItemAdd(keychainQuery.merging(attributes) { $1 } as CFDictionary, nil)
     }
+    UserDefaults.standard.set(Date(), forKey: savedAtKey)
   }
 
   func deleteSnapshot() {
     SecItemDelete(keychainQuery as CFDictionary)
+    UserDefaults.standard.removeObject(forKey: savedAtKey)
   }
 }

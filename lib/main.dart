@@ -14,6 +14,7 @@ import 'data/housing_balance_api.dart';
 import 'data/housing_webview.dart';
 import 'data/illinois_dining_api.dart';
 import 'data/local_cache.dart';
+import 'data/sign_in_log.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,8 +32,10 @@ Future<void> main() async {
 
   // Balances come from the student's own University Housing page, read
   // through a WebView that holds their NetID sign-in.
-  final housingSource =
-      AppConfig.useHousingBalances ? WebViewBalancePageSource(preferences) : null;
+  final signInLog = AppConfig.useHousingBalances ? SignInLog(preferences) : null;
+  final housingSource = AppConfig.useHousingBalances
+      ? WebViewBalancePageSource(preferences, log: signInLog)
+      : null;
 
   final repository = DiningRepository(
     diningApi: illinoisApi ?? customApi ?? demoApi,
@@ -47,5 +50,6 @@ Future<void> main() async {
     demoApi: AppConfig.useSampleMenus ? demoApi : null,
     connectivityChanges: Connectivity().onConnectivityChanged,
     onBalanceSignIn: housingSource?.markSignedIn,
+    signInLog: signInLog,
   ));
 }
