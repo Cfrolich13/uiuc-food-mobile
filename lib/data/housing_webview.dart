@@ -68,7 +68,10 @@ class WebViewBalancePageSource implements BalancePageSource {
   /// Until then, nothing is requested from the University.
   bool get hasSignedIn => _prefs.getBool(_signedInKey) ?? false;
 
-  Future<void> markSignedIn() => _prefs.setBool(_signedInKey, true);
+  Future<void> markSignedIn() async {
+    await _prefs.setBool(_signedInKey, true);
+    await SessionCookies.save();
+  }
 
   @override
   Future<String> loadBalancePageText() {

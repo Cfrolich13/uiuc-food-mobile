@@ -56,6 +56,9 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
       switch call.method {
       case "restore":
         self.restoreOnce { result($0) }
+      case "save":
+        self.saveNow()
+        result(nil)
       case "clear":
         self.deleteSnapshot()
         result(nil)

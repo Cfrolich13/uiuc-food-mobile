@@ -63,10 +63,24 @@ app file itself, not a zip.
 
 - **iOS:** an **unsigned** `.ipa`. Sign it yourself before installing, for example with
   Sideloadly, AltStore or `codesign`.
-- **Android:** a release `.apk`, signed with Flutter's default debug key so it installs
-  directly (allow installs from unknown sources). Each CI machine generates its own debug key, so
-  installing a newer build over an older one may fail with a signature mismatch; uninstall the
-  old one first. A fixed signing key would avoid this.
+- **Android:** a release `.apk` for Android 11 or newer (older versions don't trust the
+  University's certificate root). Allow installs from unknown sources to install it. To make
+  each build install over the last one (keeping your sign-in and saved data), give CI a fixed
+  signing key once:
+
+  ```sh
+  keytool -genkeypair -v -keystore release.jks -alias illini-dining \
+    -keyalg RSA -keysize 4096 -validity 10000
+  base64 -w0 release.jks   # macOS: base64 -i release.jks
+  ```
+
+  Then add repository secrets (Settings → Secrets and variables → Actions):
+  `ANDROID_KEYSTORE_BASE64` (the base64 output), `ANDROID_KEYSTORE_PASSWORD`,
+  `ANDROID_KEY_ALIAS` (`illini-dining`) and `ANDROID_KEY_PASSWORD`. Keep `release.jks` somewhere
+  safe and out of the repo. Without these secrets, each build uses a different temporary key, so
+  the previous version must be uninstalled first. For local release builds, the same values can
+  go in `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`), which
+  is git-ignored.
 
 To run it by hand, go to **Actions → Build apps → Run workflow**. Builds use the live feed by
 default; the optional inputs override its URL or add a custom backend.
@@ -170,7 +184,9 @@ page students see in a browser:
   page. Plan names like `CLASSIC 10/45 D$` give the weekly allowance (10 meals, $45 Dining
   Dollars). Meals don't roll over; Dining Dollars roll over up to two weeks' worth, so that
   plan's bar measures against $90.
-- **Staying signed in:** on iOS, a WebView keeps cookies that have an expiry date but drops
+- **Staying signed in (Android):** Android's WebView already keeps session cookies across
+  restarts; `MainActivity` flushes them to disk after sign-in and whenever the app is paused.
+- **Staying signed in (iOS):** on iOS, a WebView keeps cookies that have an expiry date but drops
   session cookies (Microsoft's, Shibboleth's and Housing's sign-in sessions) whenever the app
   quits, unlike Safari. `SessionCookieKeeper` in `ios/Runner/AppDelegate.swift` saves the
   sign-in cookies for `illinois.edu`, Microsoft sign-in and Duo hosts to the Keychain (this device

@@ -72,12 +72,16 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
         listenable: _menu,
         builder: (context, _) {
           final state = _menu.state;
-          return Column(
-            children: [
-              _DayPicker(today: _today, selected: _day, onSelected: _selectDay),
-              _DietaryFilterBar(menu: state.data),
-              Expanded(child: _content(context, hall, state)),
-            ],
+          // Keeps the end of the menu clear of the home indicator / gesture bar.
+          return SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                _DayPicker(today: _today, selected: _day, onSelected: _selectDay),
+                _DietaryFilterBar(menu: state.data),
+                Expanded(child: _content(context, hall, state)),
+              ],
+            ),
           );
         },
       ),
@@ -240,12 +244,7 @@ class _DietaryFilterBar extends StatelessWidget {
 }
 
 class _MealView extends StatefulWidget {
-  const _MealView({
-    super.key,
-    required this.meal,
-    required this.hours,
-    required this.note,
-  });
+  const _MealView({super.key, required this.meal, required this.hours, required this.note});
 
   final Meal meal;
   final List<ServiceHours> hours;
@@ -274,7 +273,8 @@ class _MealViewState extends State<_MealView> {
     final theme = Theme.of(context);
     final meal = widget.meal;
     final stations = [
-      for (final station in meal.stations) (station.name, station.items.where(prefs.matches).toList()),
+      for (final station in meal.stations)
+        (station.name, station.items.where(prefs.matches).toList()),
     ].where((s) => s.$2.isNotEmpty).toList();
     final (sections, expanded) = _sections(stations);
 
@@ -339,9 +339,7 @@ class _MealViewState extends State<_MealView> {
   /// (most cafés, LAR's lunch line) is split by course instead, since one
   /// long station is the scrolling problem collapsing is meant to solve. Only
   /// when there's nothing to split does the lone section start expanded.
-  static (List<(String, List<MenuItem>)>, bool) _sections(
-    List<(String, List<MenuItem>)> stations,
-  ) {
+  static (List<(String, List<MenuItem>)>, bool) _sections(List<(String, List<MenuItem>)> stations) {
     if (stations.length != 1) return (stations, false);
     final byCourse = <String, List<MenuItem>>{};
     for (final item in stations.single.$2) {
@@ -372,8 +370,8 @@ class _StationCard extends StatelessWidget {
     // Names the first few dishes in full and says how many more there are,
     // rather than trailing off.
     final more = items.length - 3;
-    final preview = items.take(3).map((i) => i.name).join(', ') +
-        (more > 0 ? ' and $more more' : '');
+    final preview =
+        items.take(3).map((i) => i.name).join(', ') + (more > 0 ? ' and $more more' : '');
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(

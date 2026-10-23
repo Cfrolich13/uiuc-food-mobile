@@ -116,9 +116,25 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
-      # Release build, signed with Flutter's default debug key (see
-      # android/app/build.gradle.kts) so it installs directly on a device.
+      # With these secrets set, every APK is signed with the same key, so a new
+      # build installs over the old one (keeping sign-in and saved data).
+      # Without them, android/app/build.gradle.kts falls back to the debug key.
+      - name: Set up release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::notice::No ANDROID_KEYSTORE_BASE64 secret; this APK is signed with a temporary debug key and won't install over a previous build."
+          fi
+
       - name: Build Android APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           args=(--release --build-number="$GITHUB_RUN_NUMBER")
           if [ -n "$ILLINOIS_DINING_URL" ]; then

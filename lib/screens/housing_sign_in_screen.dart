@@ -30,22 +30,24 @@ class _HousingSignInScreenState extends State<HousingSignInScreen> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onNavigationRequest: decideSignInNavigation,
-        onUrlChange: (change) {
-          final host = Uri.tryParse(change.url ?? '')?.host;
-          if (host != null && host.isNotEmpty && mounted) setState(() => _host = host);
-        },
-        onPageStarted: (_) {
-          if (mounted) setState(() => _loading = true);
-        },
-        onPageFinished: _onPageFinished,
-        onWebResourceError: (error) {
-          if ((error.isForMainFrame ?? true) && mounted) {
-            setState(() => _problem = "Couldn't reach the University. Check your connection.");
-          }
-        },
-      ));
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: decideSignInNavigation,
+          onUrlChange: (change) {
+            final host = Uri.tryParse(change.url ?? '')?.host;
+            if (host != null && host.isNotEmpty && mounted) setState(() => _host = host);
+          },
+          onPageStarted: (_) {
+            if (mounted) setState(() => _loading = true);
+          },
+          onPageFinished: _onPageFinished,
+          onWebResourceError: (error) {
+            if ((error.isForMainFrame ?? true) && mounted) {
+              setState(() => _problem = "Couldn't reach the University. Check your connection.");
+            }
+          },
+        ),
+      );
     // With the earlier sign-in restored, Microsoft can recognize the session
     // instead of asking for the password again.
     SessionCookies.restore().whenComplete(() {
@@ -76,44 +78,52 @@ class _HousingSignInScreenState extends State<HousingSignInScreen> {
         title: const Text('Sign in with NetID'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(2),
-          child: _loading
-              ? const LinearProgressIndicator(minHeight: 2)
-              : const SizedBox(height: 2),
+          child: _loading ? const LinearProgressIndicator(minHeight: 2) : const SizedBox(height: 2),
         ),
       ),
-      body: Column(
-        children: [
-          Material(
-            color: theme.colorScheme.surfaceContainerHigh,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Shows which site is on screen, so it's clear this is the
-                  // University's own page.
-                  Row(children: [
-                    Icon(Icons.lock_rounded, size: 16, color: muted),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(_host,
-                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Material(
+              color: theme.colorScheme.surfaceContainerHigh,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Shows which site is on screen, so it's clear this is the
+                    // University's own page.
+                    Row(
+                      children: [
+                        Icon(Icons.lock_rounded, size: 16, color: muted),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _host,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ]),
-                  const SizedBox(height: 4),
-                  Text(
-                    _problem ??
-                        'This is the University Housing website. Your password goes to the '
-                            'University, not to this app, which only reads your balances.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: _problem == null ? muted : theme.colorScheme.error),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      _problem ??
+                          'This is the University Housing website. Your password goes to the '
+                              'University, not to this app, which only reads your balances.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _problem == null ? muted : theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          Expanded(child: WebViewWidget(controller: _controller)),
-        ],
+            Expanded(child: WebViewWidget(controller: _controller)),
+          ],
+        ),
       ),
     );
   }
