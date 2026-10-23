@@ -6,6 +6,7 @@ class MealPlanBalance {
     required this.diningDollars,
     this.mealSwipesTotal,
     this.diningDollarsTotal,
+    this.diningDollarsWeekly,
     this.illiniCash,
     this.swipePeriod = 'semester',
   });
@@ -21,8 +22,13 @@ class MealPlanBalance {
 
   final double diningDollars;
 
-  /// Dining Dollars granted per [swipePeriod], when known.
+  /// The most Dining Dollars the balance can hold, when known; the progress
+  /// bar measures against this.
   final double? diningDollarsTotal;
+
+  /// Dining Dollars added each week, when known. Unused ones roll over up to
+  /// [diningDollarsTotal].
+  final double? diningDollarsWeekly;
 
   final double? illiniCash;
 
@@ -42,6 +48,7 @@ class MealPlanBalance {
         mealSwipesTotal: json['mealSwipesTotal'] as int?,
         diningDollars: (json['diningDollars'] as num).toDouble(),
         diningDollarsTotal: (json['diningDollarsTotal'] as num?)?.toDouble(),
+        diningDollarsWeekly: (json['diningDollarsWeekly'] as num?)?.toDouble(),
         illiniCash: (json['illiniCash'] as num?)?.toDouble(),
         swipePeriod: (json['swipePeriod'] ?? 'semester') as String,
       );
@@ -52,6 +59,7 @@ class MealPlanBalance {
         if (mealSwipesTotal != null) 'mealSwipesTotal': mealSwipesTotal,
         'diningDollars': diningDollars,
         if (diningDollarsTotal != null) 'diningDollarsTotal': diningDollarsTotal,
+        if (diningDollarsWeekly != null) 'diningDollarsWeekly': diningDollarsWeekly,
         if (illiniCash != null) 'illiniCash': illiniCash,
         'swipePeriod': swipePeriod,
       };

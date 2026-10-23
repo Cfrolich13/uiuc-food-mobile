@@ -169,7 +169,12 @@ class _DiningDollarsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = balance.diningDollarsTotal;
-    final per = total == null ? '' : ' · ${formatCurrency(total)} per ${balance.swipePeriod}';
+    final weekly = balance.diningDollarsWeekly;
+    final per = switch ((weekly, total)) {
+      (final w?, final t?) => ' · ${formatCurrency(w)} weekly, up to ${formatCurrency(t)}',
+      (null, final t?) => ' · up to ${formatCurrency(t)}',
+      _ => '',
+    };
     return _BalanceCard(
       icon: Icons.account_balance_wallet_rounded,
       label: 'Dining Dollars',

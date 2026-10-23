@@ -296,7 +296,7 @@ void main() {
     expect(find.text(r'CLASSIC 10/45 D$'), findsOneWidget);
     expect(find.text('5'), findsOneWidget);
     expect(find.text(r'$43.50'), findsOneWidget);
-    expect(find.text(r'left · $45.00 per week'), findsOneWidget);
+    expect(find.text(r'left · $45.00 weekly, up to $90.00'), findsOneWidget);
     expect(find.text('Updated just now'), findsOneWidget);
 
     // The University session expires: saved numbers stay, with a way back in.

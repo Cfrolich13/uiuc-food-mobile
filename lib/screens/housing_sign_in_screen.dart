@@ -3,6 +3,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../data/housing_balance_api.dart';
 import '../data/housing_webview.dart';
+import '../data/session_cookies.dart';
 import '../models/balance.dart';
 
 /// Shows the University's own NetID sign-in page. Once the student lands on
@@ -44,8 +45,12 @@ class _HousingSignInScreenState extends State<HousingSignInScreen> {
             setState(() => _problem = "Couldn't reach the University. Check your connection.");
           }
         },
-      ))
-      ..loadRequest(Uri.parse(HousingBalanceApi.balancesUrl));
+      ));
+    // With the earlier sign-in restored, Microsoft can recognize the session
+    // instead of asking for the password again.
+    SessionCookies.restore().whenComplete(() {
+      if (mounted) _controller.loadRequest(Uri.parse(HousingBalanceApi.balancesUrl));
+    });
   }
 
   Future<void> _onPageFinished(String url) async {

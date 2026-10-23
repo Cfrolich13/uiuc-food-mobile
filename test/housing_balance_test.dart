@@ -51,9 +51,12 @@ void main() {
     test('takes the weekly allowance from the plan name', () {
       final balance = HousingBalanceApi.parseBalancesPage(saved)!;
       expect(balance.mealSwipesTotal, 10);
-      expect(balance.diningDollarsTotal, 45);
       expect(balance.swipePeriod, 'week');
       expect(balance.swipeFraction, 0.5);
+      // $45 a week, rolling over up to two weeks' worth.
+      expect(balance.diningDollarsWeekly, 45);
+      expect(balance.diningDollarsTotal, 90);
+      expect(balance.diningDollarsFraction, closeTo(43.5 / 90, 1e-9));
     });
 
     test('is not confused by the "Meal Plan Balances" heading', () {

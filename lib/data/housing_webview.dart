@@ -6,6 +6,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'dining_api.dart';
 import 'housing_balance_api.dart';
+import 'session_cookies.dart';
 
 /// Hosts the University sign-in flow may show as the page: University sites
 /// (including shibboleth.illinois.edu), Microsoft (the University's primary
@@ -77,6 +78,8 @@ class WebViewBalancePageSource implements BalancePageSource {
   }
 
   Future<String> _load() async {
+    // Bring back the sign-in from an earlier launch before visiting Housing.
+    await SessionCookies.restore();
     final controller = _controller ??= WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted);
     final done = Completer<String>();
@@ -124,6 +127,7 @@ class WebViewBalancePageSource implements BalancePageSource {
   @override
   Future<void> signOut() async {
     await WebViewCookieManager().clearCookies();
+    await SessionCookies.clear();
     await _prefs.setBool(_signedInKey, false);
     _controller = null;
   }

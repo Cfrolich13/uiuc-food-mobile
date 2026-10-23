@@ -74,19 +74,26 @@ class HousingBalanceApi implements BalanceApi {
     if (meals == null || dollars == null) return null;
 
     final plan = valueAfter('Meal Plan') ?? 'Meal plan';
-    // Plan names like "CLASSIC 10/45 D$" give the weekly allowance:
-    // 10 meals and $45 Dining Dollars, refreshed each week.
+    // Plan names like "CLASSIC 10/45 D$" give the weekly allowance: 10 meals
+    // and $45 Dining Dollars each week. Meals don't roll over; unused Dining
+    // Dollars do, up to two weeks' worth ($90 here).
     final allowance = RegExp(r'(\d+)\s*/\s*(\d+(?:\.\d+)?)\s*D\$').firstMatch(plan);
+    final weeklyDollars = allowance == null ? null : double.parse(allowance.group(2)!);
     return MealPlanBalance(
       planName: plan,
       mealSwipesRemaining: meals,
       diningDollars: dollars,
       mealSwipesTotal: allowance == null ? null : int.parse(allowance.group(1)!),
-      diningDollarsTotal: allowance == null ? null : double.parse(allowance.group(2)!),
+      diningDollarsWeekly: weeklyDollars,
+      diningDollarsTotal: weeklyDollars == null ? null : weeklyDollars * rolloverWeeks,
       illiniCash: _money(valueAfter('Illini Cash')),
       swipePeriod: 'week',
     );
   }
+
+  /// Unused Dining Dollars carry over, but the balance can't exceed this many
+  /// weeks' worth (University Housing dining FAQ).
+  static const rolloverWeeks = 2;
 
   /// "$43.5", "$1,204.00" or "-$2" → number.
   static double? _money(String? value) {

@@ -167,12 +167,21 @@ page students see in a browser:
 - **Reading:** once the Housing page loads, the app reads its visible text and parses the
   *Meal Plan*, *Meals Remaining*, *Dining Dollars* and *Illini Cash* tiles
   (`HousingBalanceApi.parseBalancesPage`). That's the only script the app runs, and only on that
-  page. Plan names like `CLASSIC 10/45 D$` give the weekly allowance (10 meals, $45) for the
-  progress bars.
+  page. Plan names like `CLASSIC 10/45 D$` give the weekly allowance (10 meals, $45 Dining
+  Dollars). Meals don't roll over; Dining Dollars roll over up to two weeks' worth, so that
+  plan's bar measures against $90.
+- **Staying signed in:** on iOS, a WebView keeps cookies that have an expiry date but drops
+  session cookies (Microsoft's, Shibboleth's and Housing's sign-in sessions) whenever the app
+  quits, unlike Safari. `SessionCookieKeeper` in `ios/Runner/AppDelegate.swift` saves the
+  sign-in cookies for `illinois.edu`, Microsoft sign-in and Duo hosts to the Keychain (this device
+  only, not backed up) whenever they change, and restores them once per launch before the first
+  page loads. Each site still decides how long its session lasts. Answering **Yes** to
+  Microsoft's "Stay signed in?" gives the longest-lived sign-in.
 - **Refreshing:** later refreshes load the page in an off-screen WebView that shares the sign-in
   cookies. If the University asks for a sign-in again, the app keeps the saved numbers and offers
   *Sign in again*. Nothing is requested from the University until the student has signed in once,
-  and *Sign out of University Housing* clears the cookies and saved balances.
+  and *Sign out of University Housing* clears the cookies, the Keychain copy and the saved
+  balances.
 
 `test/fixtures/meal_plan_balances.html` is the balance section of the real page; if Housing
 changes the page and balances stop appearing, update the fixture and the parser together.
