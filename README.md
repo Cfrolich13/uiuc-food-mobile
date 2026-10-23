@@ -39,7 +39,7 @@ in the basement of your residence hall gives out.
     succeeds, every screen showing saved data refreshes itself.
   - Menus from past days are deleted automatically.
 - **Meal plan balances:** remaining meals, Dining Dollars and Illini Cash from your University
-  Housing account, with progress bars against your weekly allowance. Sign in once with your
+  Housing account, summarized in a compact strip at the top of the Dining tab, with progress bars against your weekly allowance. Sign in once with your
   NetID; balances refresh in the background and stay viewable offline. When the University ends
   the session, the saved numbers stay up with a prompt to sign in again.
 - **Light and dark mode:** Illini Orange and Illini Blue themes that follow the system setting.

@@ -16,6 +16,7 @@ import 'package:illini_dining/data/local_cache.dart';
 import 'package:illini_dining/models/menu.dart';
 import 'package:illini_dining/screens/halls_screen.dart';
 import 'package:illini_dining/state/controllers.dart';
+import 'package:illini_dining/widgets/balance_strip.dart';
 import 'package:illini_dining/widgets/formatting.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -154,7 +155,9 @@ void main() {
     // The saved menu is up while the network refresh is still in flight.
     expect(find.text('Grill'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+    // Balance bars are fine; an indeterminate (loading) bar is not.
+    expect(find.byWidgetPredicate((w) => w is LinearProgressIndicator && w.value == null),
+        findsNothing);
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
   });
@@ -320,6 +323,25 @@ void main() {
     expect(source.signedOut, isTrue);
     expect(find.text('Sign in with NetID'), findsOneWidget);
     expect(find.text(r'$43.50'), findsNothing);
+  });
+
+  testWidgets('dining tab shows a compact balance that opens Balances', (tester) async {
+    await _Harness().pump(tester);
+    final balance = demoBalanceFor(_now);
+    final strip = find.byType(BalanceStrip);
+    expect(strip, findsOneWidget);
+    expect(find.descendant(of: strip, matching: find.text('${balance.mealSwipesRemaining}')),
+        findsOneWidget);
+    expect(find.descendant(of: strip, matching: find.text(formatCurrency(balance.diningDollars))),
+        findsOneWidget);
+
+    await tester.tap(strip);
+    await tester.pumpAndSettle();
+    expect(find.text('Meal Plan'), findsOneWidget, reason: 'Balances tab is showing');
+
+    // Only on the main Dining list, not the Favorites tab.
+    final favoritesTab = find.byWidgetPredicate((w) => w is HallsScreen && w.favoritesOnly);
+    expect(find.descendant(of: favoritesTab, matching: find.byType(BalanceStrip)), findsNothing);
   });
 
   testWidgets('hours sheet stays clear of the Dynamic Island and can be closed', (tester) async {

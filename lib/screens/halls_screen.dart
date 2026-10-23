@@ -7,6 +7,7 @@ import '../models/dining_hall.dart';
 import '../models/menu.dart';
 import '../state/controllers.dart';
 import '../state/user_prefs.dart';
+import '../widgets/balance_strip.dart';
 import '../widgets/common.dart';
 import '../widgets/formatting.dart';
 import 'hall_detail_screen.dart';
@@ -104,6 +105,7 @@ class _HallsScreenState extends State<HallsScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         _note(context),
+        const BalanceStrip(),
         if (favorites.isNotEmpty) ...[
           const _SectionHeader('Favorites'),
           for (final hall in favorites) _HallCard(hall: hall),

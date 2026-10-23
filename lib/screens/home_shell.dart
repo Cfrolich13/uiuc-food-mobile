@@ -7,12 +7,20 @@ import 'settings_screen.dart';
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
+  static const balancesTab = 2;
+
+  /// Switches the bottom navigation to [tab], e.g. [balancesTab].
+  static void showTab(BuildContext context, int tab) =>
+      context.findAncestorStateOfType<_HomeShellState>()?._select(tab);
+
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+
+  void _select(int index) => setState(() => _index = index);
 
   static const _pages = [
     HallsScreen(),
