@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Illini Dining is a Flutter app (iOS + Android) for University of Illinois Urbana-Champaign dining:
 live menus and hours, favorites, offline menus, and meal plan balances. It is not an official
-University app. README.md has the user-facing details and the data-source write-up.
+University app. README.md has the user-facing details and the data-source write-up;
+`docs/ROADMAP.md` tracks planned features, ideas and things to watch. Keep it current when
+plans change. The native iOS and Android apps are the priority, and features should work on both.
 
 ## Commands
 
@@ -24,7 +26,9 @@ On machines whose CA store lacks *emSign Root CA - G1* (the University server's 
 it), pass `--ca-file=<pem>` to `tool/live_feed_check.dart`. Dart ignores `SSL_CERT_FILE`.
 
 CI (`.github/workflows/build.yml`) runs analyze + test once, then builds an unsigned `.ipa`
-(macOS) and a debug-key-signed release `.apk` (Linux) in parallel, uploaded unarchived. The iOS
+(macOS) and a release `.apk` (Linux) in parallel, uploaded unarchived. The APK is signed with the
+key from `ANDROID_KEYSTORE_*` secrets if set, else the debug key. Android `minSdk` is 30 because
+older versions don't trust the University's certificate root (emSign Root CA - G1). The iOS
 Swift code in `ios/Runner/AppDelegate.swift` is only compiled there, so CI is the check for it.
 
 Build-time config lives in `lib/config.dart` (`--dart-define`): `ILLINOIS_DINING_URL` (defaults to
@@ -74,10 +78,11 @@ text and `parseBalancesPage` extracts the four labelled tiles. Rules to keep:
   student has signed in once.
 - Dining Dollars roll over up to two weeks' worth (`rolloverWeeks`), so a `10/45 D$` plan's bar
   measures against $90.
-- On iOS, WKWebView drops session cookies on quit; `SessionCookieKeeper` in
-  `ios/Runner/AppDelegate.swift` snapshots sign-in cookies to the Keychain and restores them once
-  per launch via the `illini_dining/session_cookies` channel (`lib/data/session_cookies.dart`,
-  a no-op off iOS).
+- Staying signed in uses the `illini_dining/session_cookies` channel
+  (`lib/data/session_cookies.dart`: `restore`, `save`, `clear`). On iOS, WKWebView drops session
+  cookies on quit, so `SessionCookieKeeper` (`ios/Runner/AppDelegate.swift`) snapshots sign-in
+  cookies to the Keychain and restores them once per launch. Android's WebView persists session
+  cookies itself; `MainActivity.kt` only flushes them. In tests the channel is absent (no-op).
 - Microsoft passkeys can't work in an embedded WebView on either platform (only the app's own
   domain); students use "Other ways to sign in".
 

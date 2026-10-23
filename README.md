@@ -44,6 +44,8 @@ in the basement of your residence hall gives out.
   the session, the saved numbers stay up with a prompt to sign in again.
 - **Light and dark mode:** Illini Orange and Illini Blue themes that follow the system setting.
 
+Planned features and ideas are tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ## Getting started
 
 ```sh
