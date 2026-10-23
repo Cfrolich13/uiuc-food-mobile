@@ -263,5 +263,19 @@ Dining Dollars
       expect(cookies.first.meaning, 'Microsoft sign-in for this browser session');
       expect(cookies.last.meaning, 'University Housing sign-in session');
     });
+
+    test('reports cookies put back after iOS dropped them', () async {
+      final log = SignInLog(await SharedPreferences.getInstance());
+      final report = log.report(
+        current: SignInCookieReport.fromJson({
+          'cookies': const [],
+          'restoredAtLaunch': 22,
+          'putBackCount': 9,
+          'putBackAt': DateTime(2026, 10, 23, 17, 29).millisecondsSinceEpoch,
+        }),
+      );
+      expect(report, contains('Restored at this launch: 22 cookies'));
+      expect(report, contains('Last put back after going missing: 9 cookies, at 2026-10-23 17:29:00'));
+    });
   });
 }

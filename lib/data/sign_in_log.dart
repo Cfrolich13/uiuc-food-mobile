@@ -66,6 +66,10 @@ class SignInLog extends ChangeNotifier {
       if (current.restoredAtLaunch != null) {
         out.writeln('Restored at this launch: ${current.restoredAtLaunch} cookies');
       }
+      if (current.putBackCount != null) {
+        out.writeln('Last put back after going missing: ${current.putBackCount} cookies, '
+            'at ${_stamp(current.putBackAt!)}');
+      }
     }
     for (final attempt in _attempts) {
       out.writeln('\n${attempt.trigger}, ${_stamp(attempt.startedAt)}');
@@ -238,6 +242,8 @@ class SignInCookieReport {
     this.savedCount,
     this.savedAt,
     this.restoredAtLaunch,
+    this.putBackCount,
+    this.putBackAt,
   });
 
   factory SignInCookieReport.fromJson(Map<dynamic, dynamic> json) {
@@ -248,6 +254,8 @@ class SignInCookieReport {
       savedCount: json['savedCount'] as int?,
       savedAt: time(json['savedAt']),
       restoredAtLaunch: json['restoredAtLaunch'] as int?,
+      putBackCount: json['putBackCount'] as int?,
+      putBackAt: time(json['putBackAt']),
     );
   }
 
@@ -259,4 +267,9 @@ class SignInCookieReport {
 
   /// iOS only: cookies put back at this launch, once that's happened.
   final int? restoredAtLaunch;
+
+  /// iOS only: the last time saved cookies were put back because they'd
+  /// gone missing while the app was running, and how many.
+  final int? putBackCount;
+  final DateTime? putBackAt;
 }

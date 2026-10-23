@@ -105,6 +105,12 @@ class _SignInDiagnosticsScreenState extends State<SignInDiagnosticsScreen> {
                       if (report.restoredAtLaunch != null)
                         Text('Restored at this launch: ${report.restoredAtLaunch} cookies',
                             style: muted),
+                      if (report.putBackCount != null)
+                        Text(
+                          'Last put back after going missing: ${report.putBackCount} cookies, '
+                          'at ${_time.format(report.putBackAt!)}',
+                          style: muted,
+                        ),
                     ],
                   );
                 },

@@ -30,6 +30,12 @@ import WebKit
 /// (this device only, not backed up) whenever they change, and puts them back
 /// once per launch, before the first page loads. Each site still decides how
 /// long its own session is valid.
+///
+/// Session cookies can also vanish while the app is running: they live only in
+/// WebKit's networking process, which iOS may end while the app is in the
+/// background (the app keeps running, cookies with an expiry date survive).
+/// So on returning to the foreground and before each refresh, saved cookies
+/// missing from the store are put back; cookies still there are never touched.
 final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
   static let shared = SessionCookieKeeper()
 
@@ -41,6 +47,7 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
   private var restoring = false
   private var restored = false
   private var restoredCount = 0
+  private var lastPutBack: (count: Int, at: Date)?
   private var restoreWaiters: [(Int) -> Void] = []
 
   func start() {
@@ -48,6 +55,9 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
     NotificationCenter.default.addObserver(
       self, selector: #selector(saveBeforeSuspending),
       name: UIApplication.didEnterBackgroundNotification, object: nil)
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(putBackMissingOnForeground),
+      name: UIApplication.willEnterForegroundNotification, object: nil)
   }
 
   func register(with registrar: FlutterPluginRegistrar) {
@@ -57,7 +67,7 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
       guard let self = self else { return result(nil) }
       switch call.method {
       case "restore":
-        self.restoreOnce { result($0) }
+        self.restore { result($0) }
       case "save":
         self.saveNow()
         result(nil)
@@ -139,15 +149,63 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
 
   // MARK: Restoring
 
-  /// Restores the saved cookies the first time it's called each launch;
-  /// later calls just wait for that to finish, so a fresher session is never
-  /// replaced with an older snapshot.
-  func restoreOnce(completion: @escaping (Int) -> Void) {
-    if restored { return completion(0) }
+  /// Restores the saved cookies the first time it's called each launch.
+  /// Later calls wait for that, then put back only saved cookies that have
+  /// gone missing, so a fresher session is never replaced with an older
+  /// snapshot. Completes with how many cookies were put back.
+  func restore(completion: @escaping (Int) -> Void) {
+    if restored { return putBackMissing(completion: completion) }
     restoreWaiters.append(completion)
     if restoring { return }
     restoring = true
 
+    let cookies = savedCookies()
+    setCookies(cookies) { [weak self] in
+      guard let self = self else { return }
+      self.restoring = false
+      self.restored = true
+      self.restoredCount = cookies.count
+      let waiters = self.restoreWaiters
+      self.restoreWaiters = []
+      waiters.forEach { $0(cookies.count) }
+    }
+  }
+
+  @objc private func putBackMissingOnForeground() {
+    guard restored else { return }
+    putBackMissing { _ in }
+  }
+
+  /// Puts back saved cookies the store no longer has (same name, domain and
+  /// path), leaving every cookie it does have alone.
+  private func putBackMissing(completion: @escaping (Int) -> Void) {
+    let saved = savedCookies()
+    guard !saved.isEmpty else { return completion(0) }
+    store.getAllCookies { [weak self] current in
+      guard let self = self else { return completion(0) }
+      let present = Set(current.map(Self.identity))
+      let missing = saved.filter { !present.contains(Self.identity($0)) }
+      if !missing.isEmpty { self.lastPutBack = (missing.count, Date()) }
+      self.setCookies(missing) { completion(missing.count) }
+    }
+  }
+
+  private static func identity(_ cookie: HTTPCookie) -> String {
+    let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
+    return "\(cookie.name)|\(domain.lowercased())|\(cookie.path)"
+  }
+
+  private func setCookies(_ cookies: [HTTPCookie], completion: @escaping () -> Void) {
+    let group = DispatchGroup()
+    for cookie in cookies {
+      group.enter()
+      store.setCookie(cookie) { group.leave() }
+    }
+    group.notify(queue: .main, execute: completion)
+  }
+
+  /// The unexpired cookies in the Keychain snapshot.
+  private func savedCookies() -> [HTTPCookie] {
     var cookies: [HTTPCookie] = []
     if let data = readSnapshot(),
       let plist = try? PropertyListSerialization.propertyList(from: data, format: nil)
@@ -169,21 +227,7 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
         return HTTPCookie(properties: properties)
       }
     }
-
-    let group = DispatchGroup()
-    for cookie in cookies {
-      group.enter()
-      store.setCookie(cookie) { group.leave() }
-    }
-    group.notify(queue: .main) { [weak self] in
-      guard let self = self else { return }
-      self.restoring = false
-      self.restored = true
-      self.restoredCount = cookies.count
-      let waiters = self.restoreWaiters
-      self.restoreWaiters = []
-      waiters.forEach { $0(cookies.count) }
-    }
+    return cookies
   }
 
   // MARK: Diagnostics
@@ -213,6 +257,10 @@ final class SessionCookieKeeper: NSObject, WKHTTPCookieStoreObserver {
         report["savedAt"] = Self.millis(savedAt)
       }
       if self.restored { report["restoredAtLaunch"] = self.restoredCount }
+      if let putBack = self.lastPutBack {
+        report["putBackCount"] = putBack.count
+        report["putBackAt"] = Self.millis(putBack.at)
+      }
       completion(report)
     }
   }

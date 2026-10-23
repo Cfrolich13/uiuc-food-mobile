@@ -195,7 +195,12 @@ page students see in a browser:
   sign-in cookies for `illinois.edu`, Microsoft sign-in and Duo hosts to the Keychain (this device
   only, not backed up) whenever they change, and restores them once per launch before the first
   page loads. The snapshot is also saved when the app goes to the background, with time
-  requested from iOS to finish. Each site still decides how long its session lasts.
+  requested from iOS to finish. Session cookies can also vanish *while the app is running*: they
+  live only in WebKit's networking process, which iOS may end while the app is in the background
+  (diagnostics showed every session cookie gone 20 minutes after a successful refresh, in the
+  same launch, while cookies with an expiry date survived). So on returning to the foreground and
+  before each refresh, saved cookies missing from the store are put back; cookies still there
+  are never replaced. Each site still decides how long its session lasts.
 - **How long it lasts:** Housing's own session seems to end after under an hour without a visit
   (Shibboleth's default idle timeout is an hour). Getting back in goes through Microsoft, which asks for the password again
   unless its sign-in is still alive, and even then shows the account to tap. Microsoft doesn't

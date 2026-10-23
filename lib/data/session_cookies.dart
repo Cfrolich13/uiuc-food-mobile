@@ -4,16 +4,17 @@ import 'sign_in_log.dart';
 
 /// Keeps the University sign-in across app launches.
 ///
-/// On iOS the WebView forgets session cookies when the app quits, so
-/// `SessionCookieKeeper` (ios/Runner/AppDelegate.swift) saves and restores
-/// them. Android's WebView keeps them itself; `MainActivity` only flushes them
-/// to disk. In tests there's no native side and these calls do nothing.
+/// On iOS the WebView forgets session cookies when the app quits, and
+/// sometimes while it's in the background, so `SessionCookieKeeper`
+/// (ios/Runner/AppDelegate.swift) saves and restores them. Android's WebView
+/// keeps them itself; `MainActivity` only flushes them to disk. In tests there's no native side and these calls do nothing.
 abstract final class SessionCookies {
   static const _channel = MethodChannel('illini_dining/session_cookies');
 
-  /// Puts back the sign-in cookies saved by an earlier launch. Safe to call
-  /// repeatedly; only the first call per launch restores anything. Returns
-  /// how many cookies were put back (always 0 on Android and in tests).
+  /// Puts back the sign-in cookies saved by an earlier launch. Later calls
+  /// put back only saved cookies that have gone missing, never replacing one
+  /// that's there. Returns how many cookies were put back (always 0 on
+  /// Android and in tests).
   static Future<int> restore() async => await _call<int>('restore') ?? 0;
 
   /// Saves the current sign-in right away (after signing in), rather than
