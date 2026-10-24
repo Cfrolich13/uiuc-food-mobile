@@ -85,6 +85,15 @@ offline downloads of at most 3,000 tiles / 50 MB, 4 requests at a time, with a U
 app (`configureMapNetwork`); never use `tile.openstreetmap.org`, whose policy forbids offline use.
 Location permission is asked only when "Show my location" is tapped. The map is a native view, so
 `HomeShell` builds it only once its tab is opened, and tests pass a plain `mapView` instead.
+Layer colors come from `MediaQuery.platformBrightnessOf` and `AppTheme.forBrightness`, never
+`Theme.of`, which is mid-animation when the style reloads after a theme change. Pin features need
+a top-level GeoJSON `id` (`place.id`): taps report it. One-finger zoom direction (Settings → "Drag
+up to zoom in", `UserPrefs.dragUpZoomsIn`, default on for iOS only) goes over the
+`illini_dining/map_gestures` channel (`lib/data/map_gestures.dart`), re-sent after every style load
+because Android recreates its map view then. iOS sets `MLNMapView.quickZoomReversed` by key
+(`MapZoomGesture` in `AppDelegate.swift`); Android has no such option, so `MapZoomGesture.kt`
+mirrors vertical movement during a double tap's second touch so MapLibre's own quick zoom runs
+the other way. Both are compiled only in CI.
 
 **Balances** (`lib/data/housing_balance_api.dart`, `housing_webview.dart`,
 `screens/housing_sign_in_screen.dart`). There's no public balance API, so the app shows the
@@ -95,8 +104,10 @@ text and `parseBalancesPage` extracts the four labelled tiles. Rules to keep:
   `readBalancePage` reads the text and runs the page's own transaction search
   (`/MyHousing/api/MealPlanBalances/Search`, 30 days of `MealTicks` and `DiningDollars`, ending
   tomorrow since the end date itself is excluded; the reply is `text/plain` JSON), polling
-  for the result since scripts can't return a promise. A failed search leaves
-  `MealPlanBalance.transactions` null (unknown), never empty.
+  for the result since scripts can't return a promise. A failed search marks that kind in
+  `MealPlanBalance.staleHistory`; `keepingHistoryFrom` (the repository's `merge`) then keeps the
+  saved activity of that kind and its `historySavedAt`, and the screen says it's from then. With
+  nothing saved, `transactions` stays null (unknown), never empty.
 - Top-level navigation is limited by `decideSignInNavigation` to `illinois.edu`,
   `login.microsoftonline.com`, `login.microsoft.com` and Duo; frames aren't restricted.
 - Background refreshes use an off-screen WebView sharing cookies. Nothing is requested until the

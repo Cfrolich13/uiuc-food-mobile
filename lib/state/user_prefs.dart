@@ -19,6 +19,7 @@ class UserPrefs extends ChangeNotifier {
   static const _filtersKey = 'dietary_filters';
   static const _offlineDaysKey = 'offline_menu_days';
   static const _excludedKey = 'excluded_ingredients';
+  static const _dragUpZoomsInKey = 'map_drag_up_zooms_in';
 
   final SharedPreferences _prefs;
   final Set<String> _favorites;
@@ -43,6 +44,17 @@ class UserPrefs extends ChangeNotifier {
 
   Future<void> setOfflineDays(int days) async {
     await _prefs.setInt(_offlineDaysKey, days.clamp(1, AppConfig.browseDays));
+    notifyListeners();
+  }
+
+  /// Whether dragging up after a double tap zooms the map in, as in Apple
+  /// Maps, rather than out, as in Google Maps. Each platform defaults to its
+  /// own maps app.
+  bool get dragUpZoomsIn =>
+      _prefs.getBool(_dragUpZoomsInKey) ?? defaultTargetPlatform == TargetPlatform.iOS;
+
+  Future<void> setDragUpZoomsIn(bool value) async {
+    await _prefs.setBool(_dragUpZoomsInKey, value);
     notifyListeners();
   }
 

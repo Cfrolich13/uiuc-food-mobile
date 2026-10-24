@@ -27,7 +27,17 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "illini_dining/map_gestures")
+            .setMethodCallHandler { call, result ->
+                val dragUpZoomsIn = call.arguments as? Boolean
+                if (call.method != "setDragUpZoomsIn" || dragUpZoomsIn == null) {
+                    return@setMethodCallHandler result.notImplemented()
+                }
+                result.success(mapZoomGesture.apply(window.decorView, dragUpZoomsIn))
+            }
     }
+
+    private val mapZoomGesture = MapZoomGesture()
 
     /**
      * Names of the cookies the WebView would send to each sign-in site, for the

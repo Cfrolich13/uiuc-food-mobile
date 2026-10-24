@@ -125,6 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final halls = context.watch<HallsController>();
     final offlineDays = context.select<UserPrefs, int>((p) => p.offlineDays);
+    final dragUpZoomsIn = context.select<UserPrefs, bool>((p) => p.dragUpZoomsIn);
     final demoApi = context.watch<DemoDiningApi?>();
     final signInLog = context.read<SignInLog?>();
     final brightness = MediaQuery.platformBrightnessOf(context);
@@ -144,6 +145,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Theme'),
             subtitle: Text('Matches your system setting '
                 '(currently ${brightness == Brightness.dark ? 'dark' : 'light'})'),
+          ),
+          const _Header('Map'),
+          SwitchListTile(
+            secondary: const Icon(Icons.zoom_in_rounded),
+            title: const Text('Drag up to zoom in'),
+            subtitle: const Text('After a double tap, drag with one finger. On: up zooms in, '
+                'like Apple Maps. Off: down zooms in, like Google Maps.'),
+            value: dragUpZoomsIn,
+            onChanged: (value) => context.read<UserPrefs>().setDragUpZoomsIn(value),
           ),
           const _Header('Offline menus and map'),
           FutureBuilder<(int, int)>(

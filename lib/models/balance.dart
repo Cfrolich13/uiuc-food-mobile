@@ -10,6 +10,8 @@ class MealPlanBalance {
     this.illiniCash,
     this.swipePeriod = 'semester',
     this.transactions,
+    this.staleHistory = const {},
+    this.historySavedAt = const {},
   });
 
   final String planName;
@@ -37,7 +39,19 @@ class MealPlanBalance {
   /// the source doesn't provide it or it couldn't be loaded.
   final List<BalanceTransaction>? transactions;
 
-  MealPlanBalance withTransactions(List<BalanceTransaction>? transactions) => MealPlanBalance(
+  /// Kinds of activity whose latest refresh failed. Any [transactions] of
+  /// these kinds are from an earlier refresh, saved at [historySavedAt].
+  final Set<TransactionKind> staleHistory;
+
+  /// When each kind of activity was last loaded.
+  final Map<TransactionKind, DateTime> historySavedAt;
+
+  MealPlanBalance withTransactions(
+    List<BalanceTransaction>? transactions, {
+    Set<TransactionKind> staleHistory = const {},
+    Map<TransactionKind, DateTime> historySavedAt = const {},
+  }) =>
+      MealPlanBalance(
         planName: planName,
         mealSwipesRemaining: mealSwipesRemaining,
         mealSwipesTotal: mealSwipesTotal,
@@ -47,7 +61,34 @@ class MealPlanBalance {
         diningDollarsWeekly: diningDollarsWeekly,
         illiniCash: illiniCash,
         transactions: transactions,
+        staleHistory: staleHistory,
+        historySavedAt: historySavedAt,
       );
+
+  /// This fresh balance, with [previous]'s activity kept for any kind whose
+  /// refresh failed, so a dropped connection doesn't wipe saved history.
+  MealPlanBalance keepingHistoryFrom(MealPlanBalance? previous, DateTime now) {
+    // The source doesn't provide activity at all.
+    if (transactions == null && staleHistory.isEmpty) return this;
+    final kept = <BalanceTransaction>[];
+    final savedAt = <TransactionKind, DateTime>{};
+    for (final kind in TransactionKind.values) {
+      if (!staleHistory.contains(kind)) {
+        savedAt[kind] = now;
+        continue;
+      }
+      kept.addAll(previous?.transactions?.where((t) => t.kind == kind) ?? const []);
+      final when = previous?.historySavedAt[kind];
+      if (when != null) savedAt[kind] = when;
+    }
+    final all = [...?transactions, ...kept];
+    final loadedAny = staleHistory.length < TransactionKind.values.length;
+    return withTransactions(
+      all.isEmpty && !loadedAny ? null : (all..sort((a, b) => b.time.compareTo(a.time))),
+      staleHistory: staleHistory,
+      historySavedAt: savedAt,
+    );
+  }
 
   double? get swipeFraction {
     final total = mealSwipesTotal;
@@ -71,6 +112,16 @@ class MealPlanBalance {
         transactions: (json['transactions'] as List?)
             ?.map((t) => BalanceTransaction.fromJson(t as Map<String, dynamic>))
             .toList(),
+        // Unknown kind names (from a newer version) are skipped.
+        staleHistory: {
+          for (final name in (json['staleHistory'] as List?) ?? const [])
+            ?TransactionKind.values.asNameMap()[name],
+        },
+        historySavedAt: {
+          for (final MapEntry(:key, :value)
+              in ((json['historySavedAt'] as Map?) ?? const {}).entries)
+            ?TransactionKind.values.asNameMap()[key]: DateTime.parse(value as String),
+        },
       );
 
   Map<String, dynamic> toJson() => {
@@ -83,6 +134,12 @@ class MealPlanBalance {
         if (illiniCash != null) 'illiniCash': illiniCash,
         'swipePeriod': swipePeriod,
         if (transactions != null) 'transactions': [for (final t in transactions!) t.toJson()],
+        if (staleHistory.isNotEmpty) 'staleHistory': [for (final k in staleHistory) k.name],
+        if (historySavedAt.isNotEmpty)
+          'historySavedAt': {
+            for (final MapEntry(:key, :value) in historySavedAt.entries)
+              key.name: value.toIso8601String(),
+          },
       };
 }
 

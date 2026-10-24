@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +20,7 @@ import 'package:illini_dining/screens/hall_detail_screen.dart';
 import 'package:illini_dining/screens/halls_screen.dart';
 import 'package:illini_dining/screens/map_screen.dart';
 import 'package:illini_dining/state/controllers.dart';
+import 'package:illini_dining/state/user_prefs.dart';
 import 'package:illini_dining/widgets/balance_strip.dart';
 import 'package:illini_dining/widgets/campus_map_view.dart';
 import 'package:illini_dining/widgets/formatting.dart';
@@ -354,6 +356,8 @@ void main() {
     // Back in: recent meal swipes from the page's transaction search.
     source.page = _signedInPage;
     source.history = File('test/fixtures/meal_plan_search_meal_ticks.json').readAsStringSync();
+    source.dollars =
+        File('test/fixtures/meal_plan_search_dining_dollars.json').readAsStringSync();
     await controller.refresh();
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Recent activity'), 100,
@@ -362,7 +366,22 @@ void main() {
         scrollable: find.byType(Scrollable).last);
     expect(find.textContaining(RegExp(r'^1:37\sPM · Meal$')), findsOneWidget);
     expect(find.text('Today'), findsOneWidget, reason: 'grouped by day');
+    expect(find.textContaining("couldn't be"), findsNothing);
     _expectNoEllipsis(tester);
+
+    // The connection drops during the activity search: the balances update,
+    // and the saved activity stays, with a note.
+    source.history = null;
+    source.dollars = null;
+    await controller.refresh();
+    await tester.pumpAndSettle();
+    expect(find.textContaining(RegExp(r'^1:37\sPM · Meal$')), findsOneWidget);
+    await tester.scrollUntilVisible(find.textContaining("couldn't be updated"), -100,
+        scrollable: find.byType(Scrollable).last);
+    expect(
+        find.text("Recent activity couldn't be updated; showing what was saved just now. "
+            'Pull down to try again.'),
+        findsOneWidget);
 
     // Signing out forgets everything.
     await tester.scrollUntilVisible(find.text('Sign out of University Housing'), 100,
@@ -550,6 +569,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(HallDetailScreen), findsOneWidget);
   });
+
+  testWidgets('one-finger zoom direction follows the platform and can be changed', (tester) async {
+    expect(UserPrefs(await SharedPreferences.getInstance()).dragUpZoomsIn, isFalse,
+        reason: 'Android, like Google Maps');
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await _Harness().pump(tester);
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
+      await tester.pumpAndSettle();
+      final toggle = find.widgetWithText(SwitchListTile, 'Drag up to zoom in');
+      expect(tester.widget<SwitchListTile>(toggle).value, isTrue, reason: 'iOS, like Apple Maps');
+      _expectNoEllipsis(tester);
+
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('map_drag_up_zooms_in'), isFalse);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }
 
 /// Pumps the app against real feed responses captured on 2026-10-22, at
@@ -624,11 +666,15 @@ class _FakeHousingSource implements BalancePageSource {
 
   /// The "MealTicks" search response to hand back with the page.
   String? history;
+
+  /// The "DiningDollars" search response.
+  String? dollars;
   bool signedOut = false;
 
   @override
   Future<BalancePage> loadBalancePage() async =>
-      BalancePage(page ?? (throw const SignInRequired()), mealSwipesJson: history);
+      BalancePage(page ?? (throw const SignInRequired()),
+          mealSwipesJson: history, diningDollarsJson: dollars);
 
   @override
   Future<void> signOut() async {

@@ -76,9 +76,14 @@ class HousingBalanceApi implements BalanceApi {
     if (balance == null) return null;
     final swipes = _tryParse(page.mealSwipesJson, parseMealSwipes);
     final dollars = _tryParse(page.diningDollarsJson, parseDiningDollars);
-    if (swipes == null && dollars == null) return balance;
+    // Kinds whose search failed; the repository keeps their saved activity.
+    final failed = {
+      if (swipes == null) TransactionKind.mealSwipe,
+      if (dollars == null) TransactionKind.diningDollars,
+    };
     final all = [...?swipes, ...?dollars]..sort((a, b) => b.time.compareTo(a.time));
-    return balance.withTransactions(all);
+    return balance.withTransactions(failed.length == TransactionKind.values.length ? null : all,
+        staleHistory: failed);
   }
 
   static List<BalanceTransaction>? _tryParse(

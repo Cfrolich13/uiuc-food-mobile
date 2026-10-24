@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:provider/provider.dart';
 
 import '../data/campus_map.dart';
+import '../data/map_gestures.dart';
+import '../state/user_prefs.dart';
 import '../theme/app_theme.dart';
 
 /// A place on the map with its current status.
@@ -45,6 +48,7 @@ class _CampusMapViewState extends State<CampusMapView> {
   Brightness? _brightness;
   bool _fitted = false;
   bool _showLocation = false;
+  bool? _dragUpZoomsIn;
 
   @override
   void initState() {
@@ -77,12 +81,23 @@ class _CampusMapViewState extends State<CampusMapView> {
 
   void _onMapCreated(MapLibreMapController controller) {
     _controller = controller;
+    _applyZoomGesture();
     controller.onFeatureTapped.add((point, coordinates, id, layerId, annotation) {
       if (layerId != _pinLayer && layerId != _labelLayer) return;
-      for (final pin in widget.pins) {
-        if (pin.place.id == id) return widget.onPinTap(pin);
-      }
+      final pins = widget.pins;
+      if (pins.isEmpty) return;
+      // The id is the feature's GeoJSON id; failing that, the tap was on a
+      // pin or its label, so the nearest pin is the one.
+      final pin = pins.where((p) => p.place.id == id).firstOrNull ??
+          pins.reduce((a, b) => _distance(a, coordinates) <= _distance(b, coordinates) ? a : b);
+      widget.onPinTap(pin);
     });
+  }
+
+  static double _distance(MapPin pin, LatLng to) {
+    final dLat = pin.place.latitude - to.latitude;
+    final dLng = pin.place.longitude - to.longitude;
+    return dLat * dLat + dLng * dLng;
   }
 
   /// Runs after every style load, including the reload when the theme
@@ -100,17 +115,20 @@ class _CampusMapViewState extends State<CampusMapView> {
       }
     }
     if (!mounted) return;
-    final theme = Theme.of(context);
-    final open = _hex(AppTheme.openColor(context));
-    final surface = _hex(theme.colorScheme.surface);
-    await controller.addGeoJsonSource(_source, _features(), promoteId: 'place');
+    // The theme animates when it changes, so Theme.of could still be partway
+    // between the two here; these colors would then stick until a relaunch.
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final scheme = AppTheme.forBrightness(brightness).colorScheme;
+    final open = _hex(AppTheme.openColorFor(brightness));
+    final surface = _hex(scheme.surface);
+    await controller.addGeoJsonSource(_source, _features());
     await controller.addCircleLayer(
       _source,
       _pinLayer,
       CircleLayerProperties(
         // Bigger where several locations share a building.
         circleRadius: ['case', ['get', 'shared'], 12, 9],
-        circleColor: ['case', ['get', 'open'], open, _hex(theme.colorScheme.outline)],
+        circleColor: ['case', ['get', 'open'], open, _hex(scheme.outline)],
         circleStrokeWidth: 3,
         circleStrokeColor: surface,
       ),
@@ -123,7 +141,7 @@ class _CampusMapViewState extends State<CampusMapView> {
         // One of the fonts OpenFreeMap serves.
         textFont: ['Noto Sans Bold'],
         textSize: 13,
-        textColor: ['case', ['get', 'open'], open, _hex(theme.colorScheme.onSurface)],
+        textColor: ['case', ['get', 'open'], open, _hex(scheme.onSurface)],
         textHaloColor: surface,
         textHaloWidth: 1.5,
         textVariableAnchor: ['left', 'right', 'top', 'bottom'],
@@ -136,6 +154,13 @@ class _CampusMapViewState extends State<CampusMapView> {
       ),
     );
     _styleLoaded = true;
+    // Again now that the native map is surely in the window.
+    _applyZoomGesture();
+  }
+
+  void _applyZoomGesture() {
+    final value = _dragUpZoomsIn;
+    if (value != null && _controller != null) setDragUpZoomsIn(value);
   }
 
   Future<void> _drawPins() async {
@@ -154,12 +179,13 @@ class _CampusMapViewState extends State<CampusMapView> {
           for (final pin in widget.pins)
             {
               'type': 'Feature',
+              // Reported back when the pin is tapped.
+              'id': pin.place.id,
               'geometry': {
                 'type': 'Point',
                 'coordinates': [pin.place.longitude, pin.place.latitude],
               },
               'properties': {
-                'place': pin.place.id,
                 'open': pin.isOpen,
                 'shared': pin.place.halls.length > 1,
                 'label': pin.place.halls.map((h) => h.shortName).join('\n'),
@@ -202,10 +228,16 @@ class _CampusMapViewState extends State<CampusMapView> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
+    // The theme the app is heading to, not one partway through its animation.
+    final brightness = MediaQuery.platformBrightnessOf(context);
     // A new style is loading, without the pin layers until it's done.
     if (brightness != _brightness) _styleLoaded = false;
     _brightness = brightness;
+    final dragUpZoomsIn = context.select<UserPrefs, bool>((p) => p.dragUpZoomsIn);
+    if (dragUpZoomsIn != _dragUpZoomsIn) {
+      _dragUpZoomsIn = dragUpZoomsIn;
+      _applyZoomGesture();
+    }
     return Stack(
       children: [
         Semantics(

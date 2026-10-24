@@ -97,6 +97,10 @@ class BalancesScreen extends StatelessWidget {
         ],
         if (balance.transactions != null) ...[
           const SizedBox(height: 24),
+          if (staleHistoryNote(balance, context.read<Clock>().now()) case final note?) ...[
+            _InfoNote(note),
+            const SizedBox(height: 16),
+          ],
           _Activity(transactions: balance.transactions!),
         ] else if (controller.usesUniversitySignIn && !AppConfig.useSampleBalances) ...[
           const SizedBox(height: 24),
@@ -286,6 +290,23 @@ class _BalanceCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Says which activity couldn't be refreshed and when the saved copy is
+/// from; null when everything is current.
+String? staleHistoryNote(MealPlanBalance balance, DateTime now) {
+  final stale = balance.staleHistory;
+  if (stale.isEmpty) return null;
+  final what = stale.length > 1
+      ? 'Recent activity'
+      : stale.single == TransactionKind.mealSwipe
+          ? 'Recent meal swipes'
+          : 'Recent Dining Dollars activity';
+  final saved = [for (final kind in stale) ?balance.historySavedAt[kind]];
+  if (saved.isEmpty) return "$what couldn't be loaded. Pull down to try again.";
+  final oldest = saved.reduce((a, b) => a.isBefore(b) ? a : b);
+  return "$what couldn't be updated; showing what was saved ${formatSavedAt(oldest, now)}. "
+      'Pull down to try again.';
 }
 
 class _InfoNote extends StatelessWidget {

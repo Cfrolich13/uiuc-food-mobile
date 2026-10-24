@@ -123,4 +123,60 @@ void main() {
     expect(closed(DateTime(2026, 10, 23, 9)), 'Closed · Opens tomorrow at 9:00\u202fAM');
     expect(closed(DateTime(2026, 10, 25, 9), 'Brunch'), 'Closed · Brunch on Sun, Oct 25 at 9:00\u202fAM');
   });
+
+  group('keepingHistoryFrom', () {
+    const base = MealPlanBalance(planName: 'Plan', mealSwipesRemaining: 5, diningDollars: 40);
+    BalanceTransaction t(TransactionKind kind, int day) => BalanceTransaction(
+        kind: kind, time: DateTime(2026, 10, day, 12), location: 'ISR', description: 'x');
+    final earlier = DateTime(2026, 10, 20, 9);
+    final now = DateTime(2026, 10, 22, 12);
+    final saved = base.withTransactions([
+      t(TransactionKind.diningDollars, 19),
+      t(TransactionKind.mealSwipe, 18),
+    ], historySavedAt: {
+      TransactionKind.mealSwipe: earlier,
+      TransactionKind.diningDollars: earlier,
+    });
+
+    test('keeps everything saved when the whole search fails', () {
+      final fresh = base.withTransactions(null, staleHistory: TransactionKind.values.toSet());
+      final merged = fresh.keepingHistoryFrom(saved, now);
+      expect(merged.transactions!.map((x) => x.time.day), [19, 18]);
+      expect(merged.staleHistory, TransactionKind.values.toSet());
+      expect(merged.historySavedAt.values, everyElement(earlier));
+    });
+
+    test('keeps only the kind that failed, newest first', () {
+      final fresh = base.withTransactions([t(TransactionKind.mealSwipe, 21)],
+          staleHistory: {TransactionKind.diningDollars});
+      final merged = fresh.keepingHistoryFrom(saved, now);
+      expect([for (final x in merged.transactions!) (x.kind, x.time.day)], [
+        (TransactionKind.mealSwipe, 21),
+        (TransactionKind.diningDollars, 19),
+      ]);
+      expect(merged.historySavedAt,
+          {TransactionKind.mealSwipe: now, TransactionKind.diningDollars: earlier});
+    });
+
+    test('with nothing saved, a failed search leaves the history unknown', () {
+      final fresh = base.withTransactions(null, staleHistory: TransactionKind.values.toSet());
+      expect(fresh.keepingHistoryFrom(null, now).transactions, isNull);
+    });
+
+    test('sources without activity are left alone', () {
+      expect(base.keepingHistoryFrom(saved, now).transactions, isNull);
+    });
+
+    test('survives saving, and reads balances saved before these fields', () {
+      final fresh = base.withTransactions(null, staleHistory: {TransactionKind.mealSwipe});
+      final merged = fresh.keepingHistoryFrom(saved, now);
+      final restored = MealPlanBalance.fromJson(merged.toJson());
+      expect(restored.staleHistory, {TransactionKind.mealSwipe});
+      expect(restored.historySavedAt, merged.historySavedAt);
+      final old = MealPlanBalance.fromJson(
+          {'planName': 'Plan', 'mealSwipesRemaining': 5, 'diningDollars': 40});
+      expect(old.staleHistory, isEmpty);
+      expect(old.historySavedAt, isEmpty);
+    });
+  });
 }

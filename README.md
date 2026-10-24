@@ -34,7 +34,9 @@ in the basement of your residence hall gives out.
 - **Map:** every location on a campus map, named and green where it's open. Places that share a building
   (Ikenberry Dining Center and the Caffeinator) share a pin; tapping one lists what's there, and
   tapping a location opens its menu. *Show my location* asks for location access the first time
-  it's tapped. The campus area is saved for offline use (see [Map](#map)).
+  it's tapped. One-finger zoom (double tap, then drag) follows each platform's maps app by default
+  (on iPhone, drag up to zoom in, as in Apple Maps; on Android, drag down, as in Google Maps), and
+  Settings can switch it. The campus area is saved for offline use (see [Map](#map)).
 - **Offline menus:** every screen first shows what's saved on the device, then refreshes from the
   network.
   - Menus for every location are downloaded automatically, favorites first: today and the next
@@ -202,7 +204,8 @@ page students see in a browser:
   `"DiningDollars"`). Once the balances page has loaded, the app runs that same request from the
   page (so it carries the page's cookies, plus its anti-forgery token if there is one) for the
   last 30 days, ending tomorrow because the search leaves out the end date's own transactions, and parses the JSON (`parseMealSwipes`, `parseDiningDollars`). Dates are campus
-  time. If the search fails, balances still update and diagnostics notes why.
+  time. If the search fails, balances still update, the activity saved before stays on screen
+  with a note saying when it's from, and diagnostics notes why.
   `test/fixtures/meal_plan_search_*.json` are real responses.
 - **Staying signed in (Android):** Android's WebView already keeps session cookies across
   restarts; `MainActivity` flushes them to disk after sign-in and whenever the app is paused.

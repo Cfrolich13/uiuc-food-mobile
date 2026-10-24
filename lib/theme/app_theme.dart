@@ -52,9 +52,17 @@ abstract final class AppTheme {
     );
   }
 
+  static final _light = light();
+  static final _dark = dark();
+
+  /// The finished theme for [brightness]. Unlike `Theme.of`, which blends the
+  /// two while the theme animates, this is never in between.
+  static ThemeData forBrightness(Brightness brightness) =>
+      brightness == Brightness.dark ? _dark : _light;
+
   /// Color for "open now" indicators that reads well on either theme.
-  static Color openColor(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.light
-          ? const Color(0xFF1B7F3B)
-          : const Color(0xFF6FD08C);
+  static Color openColor(BuildContext context) => openColorFor(Theme.of(context).brightness);
+
+  static Color openColorFor(Brightness brightness) =>
+      brightness == Brightness.light ? const Color(0xFF1B7F3B) : const Color(0xFF6FD08C);
 }

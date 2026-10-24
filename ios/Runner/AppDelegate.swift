@@ -18,6 +18,47 @@ import WebKit
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "SessionCookieKeeper") {
       SessionCookieKeeper.shared.register(with: registrar)
     }
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "MapZoomGesture") {
+      MapZoomGesture.register(with: registrar)
+    }
+  }
+}
+
+/// Which way the map's one-finger zoom (double tap, then drag) goes.
+///
+/// MapLibre zooms in on a drag down unless `MLNMapView.quickZoomReversed` is
+/// set, which matches Apple Maps. The maplibre_gl plugin doesn't expose it, so
+/// this finds the map views on screen and sets it by key (Runner doesn't link
+/// MapLibre). Dart calls `setDragUpZoomsIn` whenever a map appears or the
+/// setting changes.
+enum MapZoomGesture {
+  static func register(with registrar: FlutterPluginRegistrar) {
+    let channel = FlutterMethodChannel(
+      name: "illini_dining/map_gestures", binaryMessenger: registrar.messenger())
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "setDragUpZoomsIn", let dragUpZoomsIn = call.arguments as? Bool else {
+        return result(FlutterMethodNotImplemented)
+      }
+      result(apply(dragUpZoomsIn: dragUpZoomsIn))
+    }
+  }
+
+  /// Returns how many map views were updated.
+  private static func apply(dragUpZoomsIn: Bool) -> Int {
+    guard let mapViewClass = NSClassFromString("MLNMapView") else { return 0 }
+    let setter = NSSelectorFromString("setQuickZoomReversed:")
+    var count = 0
+    func visit(_ view: UIView) {
+      if view.isKind(of: mapViewClass), view.responds(to: setter) {
+        view.setValue(dragUpZoomsIn, forKey: "quickZoomReversed")
+        count += 1
+      }
+      view.subviews.forEach(visit)
+    }
+    for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+      scene.windows.forEach(visit)
+    }
+    return count
   }
 }
 

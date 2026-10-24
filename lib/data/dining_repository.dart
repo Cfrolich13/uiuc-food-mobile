@@ -81,6 +81,8 @@ class DiningRepository {
         fetch: balanceApi.fetchBalance,
         encode: (b) => b.toJson(),
         decode: (json) => MealPlanBalance.fromJson(json as Map<String, dynamic>),
+        // A failed activity search keeps the activity saved before.
+        merge: (fresh, cached, now) => fresh.keepingHistoryFrom(cached, now),
       );
 
   /// Downloads and saves menus so they're available offline.
@@ -156,6 +158,7 @@ class DiningRepository {
     required Future<T> Function() fetch,
     required Object? Function(T value) encode,
     required T Function(Object? json) decode,
+    T Function(T fresh, T? cached, DateTime now)? merge,
   }) async* {
     T? cached;
     DateTime? cachedAt;
@@ -181,6 +184,7 @@ class DiningRepository {
       return;
     }
     final now = _now();
+    if (merge != null) fresh = merge(fresh, cached, now);
     await cache.write(key, encode(fresh), savedAt: now);
     yield Loaded(data: fresh, savedAt: now);
     // Reported after the fresh value is out, so listeners that refresh in
