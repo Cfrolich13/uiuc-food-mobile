@@ -3,6 +3,7 @@ import 'package:illini_dining/data/demo_dining_api.dart';
 import 'package:illini_dining/models/balance.dart';
 import 'package:illini_dining/models/dining_hall.dart';
 import 'package:illini_dining/models/menu.dart';
+import 'package:illini_dining/widgets/formatting.dart';
 
 void main() {
   final ike = demoHalls.firstWhere((h) => h.id == 'ikenberry');
@@ -110,5 +111,15 @@ void main() {
 
   test('dateKey zero-pads', () {
     expect(dateKey(DateTime(2026, 3, 7)), '2026-03-07');
+  });
+
+  test('describeStatus phrases the next opening for later days', () {
+    String closed(DateTime next, [String? meal]) =>
+        describeStatus(OpenStatus(isOpen: false, nextChange: next, nextMeal: meal), thu(22));
+    expect(closed(thu(23), 'Late Night'), 'Closed · Late Night at 11:00 PM');
+    expect(closed(DateTime(2026, 10, 23, 9), 'Continental Breakfast'),
+        'Closed · Continental Breakfast tomorrow at 9:00 AM');
+    expect(closed(DateTime(2026, 10, 23, 9)), 'Closed · Opens tomorrow at 9:00 AM');
+    expect(closed(DateTime(2026, 10, 25, 9), 'Brunch'), 'Closed · Brunch on Sun, Oct 25 at 9:00 AM');
   });
 }

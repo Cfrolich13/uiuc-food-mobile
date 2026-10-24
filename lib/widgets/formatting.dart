@@ -50,9 +50,15 @@ String describeStatus(OpenStatus status, DateTime now) {
   }
   if (next == null) return 'Closed';
   final sameDay = next.year == now.year && next.month == now.month && next.day == now.day;
-  final when = sameDay ? formatTime(next) : '${formatDay(next, now)} ${formatTime(next)}';
+  final when = sameDay ? formatTime(next) : '${_dayPhrase(next, now)} at ${formatTime(next)}';
   final meal = _meaningfulMeal(status.nextMeal);
   return meal == null ? 'Closed · Opens $when' : 'Closed · $meal at $when';
+}
+
+/// "tomorrow" or "on Fri, Oct 24", to read mid-sentence before "at 9:00 AM".
+String _dayPhrase(DateTime day, DateTime now) {
+  final label = formatDay(day, now);
+  return label == 'Tomorrow' ? 'tomorrow' : 'on $label';
 }
 
 /// Cafés publish a single all-day "Daily Menu" period, which isn't worth naming.
