@@ -7,7 +7,8 @@ import 'sign_in_log.dart';
 /// On iOS the WebView forgets session cookies when the app quits, and
 /// sometimes while it's in the background, so `SessionCookieKeeper`
 /// (ios/Runner/AppDelegate.swift) saves and restores them. Android's WebView
-/// keeps them itself; `MainActivity` only flushes them to disk. In tests there's no native side and these calls do nothing.
+/// keeps them itself; `MainActivity` only flushes them to disk. In tests
+/// there's no native side and these calls do nothing.
 abstract final class SessionCookies {
   static const _channel = MethodChannel('illini_dining/session_cookies');
 

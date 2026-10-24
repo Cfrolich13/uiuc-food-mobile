@@ -50,8 +50,8 @@ listens and calls `retry()` when the feed becomes reachable again, so all screen
 together. `Reconnector` drives the retries while offline: connectivity changes
 (`connectivity_plus`), app resume, and a 15s→2min backoff timer. `HallsController` prefetches
 `UserPrefs.offlineDays` days of menus (3 by default, set in Settings) for every location after
-the location list loads, and keeps today's
-saved menus in memory for the "stations serving now" line on cards.
+the location list loads, and keeps today's saved menus in memory for the "stations serving now"
+line on cards.
 
 **Campus time.** All dates and hours are America/Chicago wall-clock time via
 `CampusTime` (`lib/models/campus_time.dart`, `timezone` package); `Clock` provides "now" and is
@@ -74,7 +74,8 @@ sign-in (Microsoft, sometimes Shibboleth and Duo). Once that page loads, the app
 text and `parseBalancesPage` extracts the four labelled tiles. Rules to keep:
 - JavaScript is only run on the Housing balances page, never on sign-in pages. There,
   `readBalancePage` reads the text and runs the page's own transaction search
-  (`/MyHousing/api/MealPlanBalances/Search`, 30 days of `MealTicks` and `DiningDollars`), polling
+  (`/MyHousing/api/MealPlanBalances/Search`, 30 days of `MealTicks` and `DiningDollars`, ending
+  tomorrow since the end date itself is excluded; the reply is `text/plain` JSON), polling
   for the result since scripts can't return a promise. A failed search leaves
   `MealPlanBalance.transactions` null (unknown), never empty.
 - Top-level navigation is limited by `decideSignInNavigation` to `illinois.edu`,

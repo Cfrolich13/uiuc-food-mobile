@@ -77,10 +77,15 @@ Decided against for now. If revisited, host on the owner's `web.illinois.edu` si
   whether the feed is reachable.
 - **The MyHousing balances page.** Balances are read from its visible text; if Housing changes
   the labels, update `test/fixtures/meal_plan_balances.html` and `parseBalancesPage` together.
-- **How long the sign-in lasts** in practice. Housing seems to end its session after under an hour idle,
-  and re-signing in has asked for the Microsoft password each time, while Safari only needs a
-  tap on the account. Diagnostics showed iOS dropping every session cookie (Housing, Shibboleth,
-  Microsoft) mid-launch, now put back from the Keychain snapshot; check that "Last put back"
-  appears and refreshes then pass. Even with `ESTSAUTHPERSISTENT`, Microsoft's SAML flow shows
-  the account picker, which background refreshes can't pass. In Safari, signing in through
-  outlook.office.com first, then visiting Housing, has been reported to avoid that.
+- **How long the sign-in lasts.** iOS was dropping every session cookie (Housing, Shibboleth,
+  Microsoft) mid-launch; putting them back from the Keychain snapshot fixed it, and the sign-in
+  has since lasted for hours of background refreshes. If Housing's own session does end,
+  Microsoft's SAML flow shows the account picker even with `ESTSAUTHPERSISTENT`, so that takes
+  one tap. In Safari, signing in through outlook.office.com first, then visiting Housing, has
+  been reported to skip the picker; worth trying in the app (it would need Outlook's hosts in
+  the sign-in allowlist) if re-sign-ins become frequent.
+- **The MyHousing transaction search** (`/MyHousing/api/MealPlanBalances/Search`). Undocumented:
+  it answers `text/plain` holding a JSON list, and leaves out the end date's own transactions
+  (so the app ends the search tomorrow). If Recent activity disappears, Sign-in diagnostics
+  shows each response's status, type and entry count; `test/fixtures/meal_plan_search_*.json`
+  are real responses.
