@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Illini Dining is a Flutter app (iOS + Android) for University of Illinois Urbana-Champaign dining:
-live menus and hours, favorites, offline menus, and meal plan balances. It is not an official
+live menus and hours, a campus map, favorites, offline menus, and meal plan balances. It is not an official
 University app. README.md has the user-facing details and the data-source write-up;
 `docs/ROADMAP.md` tracks planned features, ideas and things to watch. Keep it current when
 plans change. The native iOS and Android apps are the priority, and features should work on both.
@@ -72,6 +72,15 @@ replace weekly `ServiceHours`. `/Menu/{id}/{M-d-yyyy}` gives items: station = `S
 (Gluten, Milk…); never infer "free from" claims. Meal periods can overlap (LAR's Lunch, Kosher
 Lunch and Field of Greens), which `statusAt` handles. `test/fixtures/` holds real captured
 responses.
+
+**Map** (`screens/map_screen.dart`, `widgets/campus_map_view.dart`, `data/campus_map.dart`).
+MapLibre (`maplibre_gl`) with OpenFreeMap vector tiles; no API key. `groupByPlace` puts locations
+sharing a building on one pin; tapping it opens a sheet of `HallCard`s. `CampusMapSaver` downloads
+the campus area in both styles for offline use after halls load, then monthly. OpenFreeMap allows
+offline downloads of at most 3,000 tiles / 50 MB, 4 requests at a time, with a User-Agent naming the
+app (`configureMapNetwork`); never use `tile.openstreetmap.org`, whose policy forbids offline use.
+Location permission is asked only when "Show my location" is tapped. The map is a native view, so
+`HomeShell` builds it only once its tab is opened, and tests pass a plain `mapView` instead.
 
 **Balances** (`lib/data/housing_balance_api.dart`, `housing_webview.dart`,
 `screens/housing_sign_in_screen.dart`). There's no public balance API, so the app shows the

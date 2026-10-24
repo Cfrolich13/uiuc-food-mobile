@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'balances_screen.dart';
 import 'halls_screen.dart';
+import 'map_screen.dart';
 import 'settings_screen.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
+  static const mapTab = 1;
   static const balancesTab = 2;
 
   /// Switches the bottom navigation to [tab], e.g. [balancesTab].
@@ -20,22 +22,26 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  void _select(int index) => setState(() => _index = index);
+  /// The map is a native view, so it's only built once its tab is opened.
+  bool _mapOpened = false;
 
-  static const _pages = [
-    HallsScreen(),
-    HallsScreen(favoritesOnly: true),
-    BalancesScreen(),
-    SettingsScreen(),
-  ];
+  void _select(int index) => setState(() {
+        _index = index;
+        if (index == HomeShell.mapTab) _mapOpened = true;
+      });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
+      body: IndexedStack(index: _index, children: [
+        const HallsScreen(),
+        if (_mapOpened) const MapScreen() else const SizedBox.shrink(),
+        const BalancesScreen(),
+        const SettingsScreen(),
+      ]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _select,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.restaurant_outlined),
@@ -43,9 +49,9 @@ class _HomeShellState extends State<HomeShell> {
             label: 'Dining',
           ),
           NavigationDestination(
-            icon: Icon(Icons.star_outline_rounded),
-            selectedIcon: Icon(Icons.star_rounded),
-            label: 'Favorites',
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map_rounded),
+            label: 'Map',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_balance_wallet_outlined),

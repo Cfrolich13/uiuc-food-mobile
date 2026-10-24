@@ -42,6 +42,8 @@ dependencies:
   timezone: ^0.11.2
   connectivity_plus: ^7.3.2
   webview_flutter: ^4.14.1
+  maplibre_gl: ^0.27.1
+  geolocator: ^14.0.1
 
 dev_dependencies:
   flutter_test:

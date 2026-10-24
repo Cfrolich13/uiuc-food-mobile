@@ -12,11 +12,9 @@ import '../widgets/common.dart';
 import '../widgets/formatting.dart';
 import 'hall_detail_screen.dart';
 
-/// Lists dining locations. With [favoritesOnly], shows just the user's favorites.
+/// Lists dining locations, with favorites pinned at the top.
 class HallsScreen extends StatefulWidget {
-  const HallsScreen({super.key, this.favoritesOnly = false});
-
-  final bool favoritesOnly;
+  const HallsScreen({super.key});
 
   @override
   State<HallsScreen> createState() => _HallsScreenState();
@@ -50,7 +48,7 @@ class _HallsScreenState extends State<HallsScreen> {
     final halls = state.data;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.favoritesOnly ? 'Favorites' : 'Illini Dining')),
+      appBar: AppBar(title: const Text('Illini Dining')),
       // Saved data shows straight away and refreshes quietly in the background;
       // a spinner only appears when there's nothing saved to show.
       body: RefreshIndicator(
@@ -78,23 +76,6 @@ class _HallsScreenState extends State<HallsScreen> {
     }
 
     final favorites = halls.where((h) => prefs.isFavorite(h.id)).toList();
-    if (widget.favoritesOnly) {
-      if (favorites.isEmpty) {
-        return _scrollable(const EmptyState(
-          icon: Icons.star_outline_rounded,
-          title: 'No favorites yet',
-          message: 'Tap the star on any dining hall to pin it here and at the top of the list.',
-        ));
-      }
-      return ExactScrollList(
-        controller: _scroll,
-        padding: const EdgeInsets.all(16),
-        children: [
-          _note(context),
-          for (final hall in favorites) _HallCard(hall: hall),
-        ],
-      );
-    }
 
     // Favorites are pinned at the top and also stay in their usual section.
     final diningHalls = halls.where((h) => h.type == VenueType.diningHall).toList();
@@ -108,15 +89,15 @@ class _HallsScreenState extends State<HallsScreen> {
         const BalanceStrip(),
         if (favorites.isNotEmpty) ...[
           const _SectionHeader('Favorites'),
-          for (final hall in favorites) _HallCard(hall: hall),
+          for (final hall in favorites) HallCard(hall: hall),
         ],
         if (diningHalls.isNotEmpty) ...[
           const _SectionHeader('Dining Halls'),
-          for (final hall in diningHalls) _HallCard(hall: hall),
+          for (final hall in diningHalls) HallCard(hall: hall),
         ],
         if (cafes.isNotEmpty) ...[
           const _SectionHeader('Cafés & More'),
-          for (final hall in cafes) _HallCard(hall: hall),
+          for (final hall in cafes) HallCard(hall: hall),
         ],
       ],
     );
@@ -158,8 +139,9 @@ class _SectionHeader extends StatelessWidget {
       );
 }
 
-class _HallCard extends StatelessWidget {
-  const _HallCard({required this.hall});
+/// A location's name, open status and stations serving now; opens its menu.
+class HallCard extends StatelessWidget {
+  const HallCard({super.key, required this.hall});
 
   final DiningHall hall;
 

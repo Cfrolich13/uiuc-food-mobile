@@ -5,14 +5,6 @@ scheduled; the native iOS and Android apps come first.
 
 ## Planned
 
-### Map tab (replaces Favorites)
-
-Favorites are already pinned at the top of the Dining tab, so the Favorites tab can become a map
-of dining locations. `/LocationSchedules` already provides `Lat`/`Long` for every location
-(parsed into `DiningHall.latitude`/`longitude`), so no new data is needed. Show open/closed
-status on the pins and open the menu on tap. A tile source that needs no API key (e.g.
-OpenStreetMap via `flutter_map`) avoids keys in the repo; check its usage policy.
-
 ### Desktop app
 
 Flutter can build the same code for macOS, Windows and Linux; add the platforms with

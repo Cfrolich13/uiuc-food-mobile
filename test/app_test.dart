@@ -15,9 +15,12 @@ import 'package:illini_dining/data/illinois_dining_api.dart';
 import 'package:illini_dining/data/local_cache.dart';
 import 'package:illini_dining/data/sign_in_log.dart';
 import 'package:illini_dining/models/menu.dart';
+import 'package:illini_dining/screens/hall_detail_screen.dart';
 import 'package:illini_dining/screens/halls_screen.dart';
+import 'package:illini_dining/screens/map_screen.dart';
 import 'package:illini_dining/state/controllers.dart';
 import 'package:illini_dining/widgets/balance_strip.dart';
+import 'package:illini_dining/widgets/campus_map_view.dart';
 import 'package:illini_dining/widgets/formatting.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,6 +48,7 @@ class _Harness {
       demoApi: api,
       clock: Clock(() => _now),
       connectivityChanges: connectivity,
+      mapView: _fakeMapView,
     ));
     if (settle) await tester.pumpAndSettle();
   }
@@ -73,20 +77,12 @@ void main() {
     // A "Favorites" section header now appears above the other halls, and the
     // hall is listed both there and in its usual section.
     expect(find.text('Favorites'), findsNWidgets(before + 1));
-    final mainList = find.byWidgetPredicate((w) => w is HallsScreen && !w.favoritesOnly);
+    final mainList = find.byType(HallsScreen);
     expect(find.descendant(of: mainList, matching: find.text('Pennsylvania Avenue Dining Hall')),
         findsNWidgets(2));
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getStringList('favorite_halls'), ['par']);
 
-    // Favorites tab shows just that hall.
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Favorites'));
-    await tester.pumpAndSettle();
-    final favoritesTab = find.byWidgetPredicate((w) => w is HallsScreen && w.favoritesOnly);
-    expect(find.descendant(of: favoritesTab, matching: find.text('Pennsylvania Avenue Dining Hall')),
-        findsOneWidget);
-    expect(find.descendant(of: favoritesTab, matching: find.text('Ikenberry Dining Center')),
-        findsNothing);
   });
 
   testWidgets('hall menu opens on the current meal and filters by diet', (tester) async {
@@ -455,9 +451,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Meal Plan'), findsOneWidget, reason: 'Balances tab is showing');
 
-    // Only on the main Dining list, not the Favorites tab.
-    final favoritesTab = find.byWidgetPredicate((w) => w is HallsScreen && w.favoritesOnly);
-    expect(find.descendant(of: favoritesTab, matching: find.byType(BalanceStrip)), findsNothing);
   });
 
   testWidgets('hours sheet stays clear of the Dynamic Island and can be closed', (tester) async {
@@ -522,6 +515,41 @@ void main() {
     expect(Theme.of(tester.element(find.text('Ikenberry Dining Center'))).brightness,
         Brightness.light);
   });
+
+  testWidgets('the Map tab pins each place with its status', (tester) async {
+    await _Harness().pump(tester);
+    expect(find.byType(MapScreen), findsNothing, reason: 'built when first opened');
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Map'));
+    await tester.pumpAndSettle();
+
+    // The demo has seven locations in four buildings.
+    expect(find.textContaining(' pin: '), findsNWidgets(4));
+    expect(find.textContaining('Open pin: Ikenberry Dining Center, Open until 2:00\u202fPM'),
+        findsOneWidget);
+    _expectNoEllipsis(tester);
+  });
+
+  testWidgets('a map pin lists every location in the building and opens menus', (tester) async {
+    await _pumpWithLiveCapture(tester);
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Map'));
+    await tester.pumpAndSettle();
+
+    // Ikenberry Dining Center and the Caffeinator share an address.
+    expect(find.textContaining(' pin: '), findsNWidgets(2));
+    await tester.tap(find.textContaining('pin: Ikenberry Dining Center at Ikenberry Commons'));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    expect(find.descendant(of: sheet, matching: find.byType(HallCard)), findsNWidgets(2));
+    expect(find.descendant(of: sheet, matching: find.text('Caffeinator at Ikenberry Commons')),
+        findsOneWidget);
+    _expectNoEllipsis(tester);
+
+    await tester.tap(find.descendant(
+        of: sheet, matching: find.text('Ikenberry Dining Center at Ikenberry Commons')));
+    await tester.pumpAndSettle();
+    expect(find.byType(HallDetailScreen), findsOneWidget);
+  });
 }
 
 /// Pumps the app against real feed responses captured on 2026-10-22, at
@@ -550,9 +578,22 @@ Future<void> _pumpWithLiveCapture(WidgetTester tester) async {
     ),
     preferences: await SharedPreferences.getInstance(),
     clock: Clock(() => now),
+    mapView: _fakeMapView,
   ));
   await tester.pumpAndSettle();
 }
+
+/// Stands in for the native map: a button per pin, labelled with its status.
+Widget _fakeMapView(BuildContext context, List<MapPin> pins, ValueChanged<MapPin> onPinTap) =>
+    SingleChildScrollView(
+      child: Column(children: [
+        for (final pin in pins)
+          TextButton(
+            onPressed: () => onPinTap(pin),
+            child: Text('${pin.isOpen ? 'Open' : 'Closed'} pin: ${pin.label}'),
+          ),
+      ]),
+    );
 
 /// Fails if any visible text was cut short, with "…" or otherwise.
 void _expectNoEllipsis(WidgetTester tester) {

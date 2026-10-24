@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'config.dart';
+import 'data/campus_map.dart';
 import 'data/demo_dining_api.dart';
 import 'data/dining_api.dart';
 import 'data/dining_repository.dart';
@@ -37,6 +38,12 @@ Future<void> main() async {
       ? WebViewBalancePageSource(preferences, log: signInLog)
       : null;
 
+  try {
+    await configureMapNetwork();
+  } catch (e) {
+    debugPrint('Map network setup failed: $e');
+  }
+
   final repository = DiningRepository(
     diningApi: illinoisApi ?? customApi ?? demoApi,
     balanceApi: customApi ?? (housingSource == null ? demoApi : HousingBalanceApi(housingSource)),
@@ -51,5 +58,6 @@ Future<void> main() async {
     connectivityChanges: Connectivity().onConnectivityChanged,
     onBalanceSignIn: housingSource?.markSignedIn,
     signInLog: signInLog,
+    mapRegions: MapLibreOfflineRegions(),
   ));
 }

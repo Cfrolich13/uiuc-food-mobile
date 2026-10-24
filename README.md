@@ -29,8 +29,12 @@ in the basement of your residence hall gives out.
   incomplete, so it's never a "free from" guarantee.
 - **Campus time:** hours and dates are always shown in Champaign time, whatever time zone the
   phone is set to.
-- **Favorites:** star any location to pin it to the top of the list and to the Favorites tab.
-  Favorites are stored on the device.
+- **Favorites:** star any location to pin it to the top of the Dining list. Favorites are stored
+  on the device.
+- **Map:** every location on a campus map, green where it's open. Places that share a building
+  (Ikenberry Dining Center and the Caffeinator) share a pin; tapping one lists what's there, and
+  tapping a location opens its menu. *Show my location* asks for location access the first time
+  it's tapped. The campus area is saved for offline use (see [Map](#map)).
 - **Offline menus:** every screen first shows what's saved on the device, then refreshes from the
   network.
   - Menus for every location are downloaded automatically, favorites first: today and the next
@@ -111,7 +115,7 @@ lib/
     local_cache.dart         FileCache (JSON files on device) + MemoryCache (tests)
     dining_repository.dart   cache-then-network streams, prefetch, pruning
   state/                     ChangeNotifier controllers (provider)
-  screens/                   dining list, hall menu, balances, settings
+  screens/                   dining list, map, hall menu, balances, settings
   widgets/                   shared UI and formatting
 ```
 
@@ -233,6 +237,20 @@ page students see in a browser:
 
 `test/fixtures/meal_plan_balances.html` is the balance section of the real page; if Housing
 changes the page and balances stop appearing, update the fixture and the parser together.
+
+### Map
+
+The Map tab uses [MapLibre](https://maplibre.org/) (`maplibre_gl`, native on iOS and Android) with
+vector tiles from [OpenFreeMap](https://openfreemap.org/), built from OpenStreetMap data. No API
+key is needed, and MapLibre shows the attribution. Pins come from the `Lat`/`Long` that
+`/LocationSchedules` already returns.
+
+The campus area (every location plus about 900 m, zoom 13–17, light and dark styles) is downloaded
+for offline use after the location list loads, and again monthly or when locations move
+(`CampusMapSaver`). That's a few dozen tiles, well within OpenFreeMap's offline terms: at most
+3,000 tiles or 50 MB per download, 4 requests at a time, and a User-Agent naming the app (set in
+`configureMapNetwork`). OpenStreetMap's own tile servers (`tile.openstreetmap.org`) forbid offline
+use, so they aren't used.
 
 ### Custom backend
 

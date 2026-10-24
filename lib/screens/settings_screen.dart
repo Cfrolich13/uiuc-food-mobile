@@ -5,6 +5,7 @@ import '../config.dart';
 import '../data/demo_dining_api.dart';
 import '../data/dining_repository.dart';
 import '../data/sign_in_log.dart';
+import '../state/campus_map_saver.dart';
 import '../state/controllers.dart';
 import '../state/user_prefs.dart';
 import '../widgets/formatting.dart';
@@ -129,6 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final brightness = MediaQuery.platformBrightnessOf(context);
     final now = context.read<Clock>().now();
     final theme = Theme.of(context);
+    final mapSavedAt = context.watch<CampusMapSaver>().savedAt;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -143,7 +145,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text('Matches your system setting '
                 '(currently ${brightness == Brightness.dark ? 'dark' : 'light'})'),
           ),
-          const _Header('Offline menus'),
+          const _Header('Offline menus and map'),
           FutureBuilder<(int, int)>(
             future: _cacheStats,
             builder: (context, snapshot) {
@@ -174,6 +176,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('Saves every menu for the week ahead now.'),
             enabled: !halls.syncing,
             onTap: _downloadWeek,
+          ),
+          ListTile(
+            leading: const Icon(Icons.map_outlined),
+            title: const Text('Campus map'),
+            subtitle: Text(mapSavedAt == null
+                ? "Saved for offline use the next time you're online"
+                // Device time on both sides: this is the download's age, not campus time.
+                : 'Saved for offline use · updated ${formatSavedAt(mapSavedAt, DateTime.now())}'),
           ),
           ListTile(
             leading: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error),
