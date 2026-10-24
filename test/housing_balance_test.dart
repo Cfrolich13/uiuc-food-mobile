@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -9,6 +10,7 @@ import 'package:illini_dining/data/housing_webview.dart';
 import 'package:illini_dining/data/local_cache.dart';
 import 'package:illini_dining/data/demo_dining_api.dart';
 import 'package:illini_dining/data/sign_in_log.dart';
+import 'package:illini_dining/models/balance.dart';
 import 'package:illini_dining/state/controllers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -24,17 +26,19 @@ String pageText(String html) => html
 class FakePageSource implements BalancePageSource {
   FakePageSource(this.result);
 
-  /// Page text to return, or an exception to throw.
+  /// Page text (or a [BalancePage]) to return, or an exception to throw.
   Object result;
   bool signedOut = false;
   int loads = 0;
 
   @override
-  Future<String> loadBalancePageText() async {
+  Future<BalancePage> loadBalancePage() async {
     loads++;
-    final r = result;
-    if (r is String) return r;
-    throw r;
+    return switch (result) {
+      final String text => BalancePage(text),
+      final BalancePage page => page,
+      final error => throw error,
+    };
   }
 
   @override
@@ -139,6 +143,55 @@ Dining Dollars
           NavigationDecision.navigate);
       expect(decide('https://example.com/'), NavigationDecision.prevent);
       expect(decide('https://example.com/frame', mainFrame: false), NavigationDecision.navigate);
+    });
+  });
+
+  group('transaction history', () {
+    final mealTicks = File('test/fixtures/meal_plan_search_meal_ticks.json').readAsStringSync();
+    final diningDollars =
+        File('test/fixtures/meal_plan_search_dining_dollars.json').readAsStringSync();
+
+    test('reads meal swipes from the page search', () {
+      final swipes = HousingBalanceApi.parseMealSwipes(mealTicks);
+      expect(swipes, hasLength(6));
+      expect(swipes.first.kind, TransactionKind.mealSwipe);
+      expect(swipes.first.location, 'ISR');
+      expect(swipes.first.time, DateTime(2026, 10, 22, 19, 41, 10), reason: 'campus time as given');
+      expect(swipes.first.amount, isNull);
+    });
+
+    test('reads Dining Dollars purchases and rollovers', () {
+      final dollars = HousingBalanceApi.parseDiningDollars(diningDollars);
+      expect(dollars, hasLength(12));
+      expect(dollars.first.location, 'Terrabyte');
+      expect(dollars.first.description, 'Purchase');
+      expect(dollars.first.amount, -4.29);
+      final rollover = dollars.firstWhere((t) => t.description == 'Rollover');
+      expect(rollover.location, '');
+      expect(rollover.amount, 45);
+    });
+
+    test('merges both kinds newest first, and keeps them when saved', () {
+      final balance = HousingBalanceApi.parsePage(
+          BalancePage(saved, mealSwipesJson: mealTicks, diningDollarsJson: diningDollars))!;
+      final all = balance.transactions!;
+      expect(all, hasLength(18));
+      expect(all.first.time, DateTime(2026, 10, 23, 10, 35, 41));
+      for (var i = 1; i < all.length; i++) {
+        expect(all[i].time.isAfter(all[i - 1].time), isFalse);
+      }
+      final restored = MealPlanBalance.fromJson(
+          jsonDecode(jsonEncode(balance.toJson())) as Map<String, dynamic>);
+      expect(restored.transactions!.map((t) => t.toJson()), all.map((t) => t.toJson()));
+    });
+
+    test('a failed or garbled search leaves only that history out', () {
+      final one = HousingBalanceApi.parsePage(
+          BalancePage(saved, mealSwipesJson: mealTicks, diningDollarsJson: '<html>'))!;
+      expect(one.transactions, hasLength(6));
+      final none = HousingBalanceApi.parsePage(BalancePage(saved))!;
+      expect(none.transactions, isNull, reason: 'unknown, rather than no activity');
+      expect(none.diningDollars, 43.5);
     });
   });
 

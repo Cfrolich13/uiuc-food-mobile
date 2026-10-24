@@ -88,7 +88,8 @@ class _HousingSignInScreenState extends State<HousingSignInScreen> {
     setState(() => _loading = false);
     final uri = Uri.tryParse(url);
     if (uri == null || !HousingBalanceApi.isBalancesPage(uri)) return;
-    final balance = HousingBalanceApi.parseBalancesPage(await readPageText(_controller));
+    final balance =
+        HousingBalanceApi.parsePage(await readBalancePage(_controller, record: _record));
     if (!mounted) return;
     if (balance == null) {
       _record?.note("balances page didn't show balances");

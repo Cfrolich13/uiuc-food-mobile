@@ -61,6 +61,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
               icon: const Icon(Icons.info_outline_rounded),
               onPressed: () => _showInfo(context, hall),
             ),
+          _FiltersButton(onPressed: () => _showFilters(context)),
           FavoriteButton(
             name: hall?.name,
             isFavorite: prefs.isFavorite(widget.hallId),
@@ -78,7 +79,7 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
             child: Column(
               children: [
                 _DayPicker(today: _today, selected: _day, onSelected: _selectDay),
-                _DietaryFilterBar(menu: state.data),
+                const _ActiveFiltersNote(),
                 Expanded(child: _content(context, hall, state)),
               ],
             ),
@@ -159,6 +160,20 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
     return index < 0 ? 0 : index;
   }
 
+  void _showFilters(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+      builder: (_) => ListenableBuilder(
+        listenable: _menu,
+        builder: (_, _) => _FiltersSheet(menu: _menu.state.data),
+      ),
+    );
+  }
+
   void _showInfo(BuildContext context, DiningHall hall) {
     showModalBottomSheet<void>(
       context: context,
@@ -203,42 +218,144 @@ class _DayPicker extends StatelessWidget {
   }
 }
 
-class _DietaryFilterBar extends StatelessWidget {
-  const _DietaryFilterBar({required this.menu});
+/// Opens the filters sheet; shows how many filters are on.
+class _FiltersButton extends StatelessWidget {
+  const _FiltersButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = context.watch<UserPrefs>();
+    final count = prefs.dietaryFilters.length + prefs.excludedIngredients.length;
+    return IconButton(
+      tooltip: count == 0 ? 'Filters' : 'Filters, $count on',
+      icon: Badge(
+        isLabelVisible: count > 0,
+        label: Text('$count'),
+        child: const Icon(Icons.tune_rounded),
+      ),
+      onPressed: onPressed,
+    );
+  }
+}
+
+/// A one-line summary of the filters in use, so hidden items aren't a mystery.
+class _ActiveFiltersNote extends StatelessWidget {
+  const _ActiveFiltersNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = context.watch<UserPrefs>();
+    if (!prefs.hasFilters) return const SizedBox(height: 4);
+    final theme = Theme.of(context);
+    final diets = [
+      for (final tag in DietaryTag.preferences)
+        if (prefs.dietaryFilters.contains(tag)) tag.label,
+    ];
+    final excluded = prefs.excludedIngredients.toList()..sort(_byName);
+    final text = [
+      if (diets.isNotEmpty) diets.join(', '),
+      if (excluded.isNotEmpty) 'No ${excluded.join(', ')}',
+    ].join(' · ');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+      child: Row(
+        children: [
+          Icon(Icons.filter_alt_rounded, size: 16, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Expanded(child: Text(text, style: theme.textTheme.bodySmall)),
+          TextButton(onPressed: prefs.clearFilters, child: const Text('Clear')),
+        ],
+      ),
+    );
+  }
+}
+
+int _byName(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
+
+/// Diet filters and ingredient exclusions, applied to every menu as they're
+/// changed.
+class _FiltersSheet extends StatelessWidget {
+  const _FiltersSheet({required this.menu});
 
   final DailyMenu? menu;
 
   @override
   Widget build(BuildContext context) {
     final prefs = context.watch<UserPrefs>();
-    // Offer only diets this menu actually labels, plus any already selected.
-    final present = menu?.meals
-        .expand((m) => m.stations)
-        .expand((s) => s.items)
-        .expand((i) => i.tags)
-        .toSet();
-    final tags = [
-      for (final tag in DietaryTag.preferences)
-        if (present == null || present.contains(tag) || prefs.dietaryFilters.contains(tag)) tag,
+    final theme = Theme.of(context);
+    final items = [
+      for (final meal in menu?.meals ?? const <Meal>[])
+        for (final station in meal.stations) ...station.items,
     ];
-    if (tags.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 48,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-        itemCount: tags.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final tag = tags[i];
-          return FilterChip(
-            label: Text(tag.label),
-            selected: prefs.dietaryFilters.contains(tag),
-            onSelected: (_) => prefs.toggleDietaryFilter(tag),
-            visualDensity: VisualDensity.compact,
-          );
-        },
-      ),
+    // Offer only diets this menu labels (all of them before it loads), plus
+    // any already chosen.
+    final presentTags = items.expand((i) => i.tags).toSet();
+    final diets = [
+      for (final tag in DietaryTag.preferences)
+        if (menu == null || presentTags.contains(tag) || prefs.dietaryFilters.contains(tag)) tag,
+    ];
+    // Common ingredients, plus any others this menu lists or already excluded.
+    final known = {for (final name in UserPrefs.commonIngredients) name.toLowerCase(): name};
+    for (final name in [...items.expand((i) => i.contains), ...prefs.excludedIngredients]) {
+      known.putIfAbsent(name.toLowerCase(), () => name);
+    }
+    final ingredients = known.values.toList()..sort(_byName);
+
+    Widget heading(String text) => Padding(
+          padding: const EdgeInsets.only(top: 16, bottom: 8),
+          child: Text(text, style: theme.textTheme.titleMedium),
+        );
+
+    return ListView(
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('Filters', style: theme.textTheme.titleLarge)),
+            TextButton(
+              onPressed: prefs.hasFilters ? prefs.clearFilters : null,
+              child: const Text('Clear all'),
+            ),
+          ],
+        ),
+        if (diets.isNotEmpty) ...[
+          heading('Show only'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final tag in diets)
+                FilterChip(
+                  label: Text(tag.label),
+                  selected: prefs.dietaryFilters.contains(tag),
+                  onSelected: (_) => prefs.toggleDietaryFilter(tag),
+                ),
+            ],
+          ),
+        ],
+        heading('Hide items containing'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final ingredient in ingredients)
+              FilterChip(
+                label: Text(ingredient),
+                selected: prefs.excludedIngredients.contains(ingredient),
+                onSelected: (_) => prefs.toggleExcludedIngredient(ingredient),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Uses the ingredients University Housing lists for each item, which can be '
+          'incomplete. If you have an allergy, check with dining staff.',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+      ],
     );
   }
 }
@@ -310,9 +427,9 @@ class _MealViewState extends State<_MealView> {
             EmptyState(
               icon: Icons.filter_alt_off_rounded,
               title: 'Nothing matches your filters',
-              message: 'Try removing a dietary filter.',
+              message: 'Try removing a filter.',
               action: TextButton(
-                onPressed: prefs.clearDietaryFilters,
+                onPressed: prefs.clearFilters,
                 child: const Text('Clear filters'),
               ),
             ),

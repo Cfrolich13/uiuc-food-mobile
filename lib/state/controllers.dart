@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
-import '../config.dart';
 import '../data/dining_repository.dart';
 import '../data/housing_balance_api.dart';
 import '../models/balance.dart';
@@ -51,7 +50,7 @@ class HallsController extends Loader<List<DiningHall>> {
   void onLoaded(Loaded<List<DiningHall>> value) {
     if (value.data == null) return;
     if (value.error == null) {
-      syncMenus(days: AppConfig.prefetchDays);
+      syncMenus();
     } else {
       // Offline: today's menus may already be saved from an earlier sync.
       _loadTodayMenus();
@@ -71,9 +70,11 @@ class HallsController extends Loader<List<DiningHall>> {
     notifyListeners();
   }
 
-  /// Saves menus for the next [days] days (starting today) to the device.
-  /// Favorites are downloaded first so they're ready soonest.
-  Future<int> syncMenus({int days = AppConfig.prefetchDays}) async {
+  /// Saves menus for the next [days] days (starting today; by default the
+  /// number chosen in Settings) to the device. Favorites are downloaded first
+  /// so they're ready soonest.
+  Future<int> syncMenus({int? days}) async {
+    days ??= prefs.offlineDays;
     final halls = state.data;
     if (halls == null || _syncing) return 0;
     _syncing = true;

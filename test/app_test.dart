@@ -119,9 +119,50 @@ void main() {
         scrollable: find.byType(Scrollable).last);
     expect(find.text(nonVegan.name), findsOneWidget);
 
+    // Filters live in a sheet and apply as they're chosen.
+    await tester.tap(find.byTooltip('Filters'));
+    await tester.pumpAndSettle();
+    _expectNoEllipsis(tester);
     await tester.tap(find.widgetWithText(FilterChip, 'Vegan'));
     await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(200, 40)); // the backdrop closes the sheet
+    await tester.pumpAndSettle();
     expect(find.text(nonVegan.name), findsNothing);
+    expect(find.byTooltip('Filters, 1 on'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Clear'), findsOneWidget,
+        reason: 'summary of the filters in use');
+
+    await tester.tap(find.widgetWithText(TextButton, 'Clear'));
+    await tester.pumpAndSettle();
+    expect(find.text(nonVegan.name), findsOneWidget);
+  });
+
+  testWidgets('hides menu items containing excluded ingredients', (tester) async {
+    await _Harness().pump(tester);
+    await tester.tap(find.text('Ikenberry Dining Center'));
+    await tester.pumpAndSettle();
+
+    final lunch = buildDemoMenu(demoHalls.first, _now).meals[1];
+    final station = lunch.stations
+        .firstWhere((s) => s.items.any((i) => i.tags.contains(DietaryTag.containsDairy)));
+    final dairy = station.items.firstWhere((i) => i.tags.contains(DietaryTag.containsDairy));
+    await tester.scrollUntilVisible(find.text(station.name), 200,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text(station.name));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text(dairy.name), 200,
+        scrollable: find.byType(Scrollable).last);
+
+    await tester.tap(find.byTooltip('Filters'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.widgetWithText(FilterChip, 'Milk'), 100,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.widgetWithText(FilterChip, 'Milk'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(200, 40));
+    await tester.pumpAndSettle();
+    expect(find.text(dairy.name), findsNothing);
+    expect(find.text('No Milk'), findsOneWidget);
   });
 
   testWidgets('saved menus still show when offline', (tester) async {
@@ -136,8 +177,11 @@ void main() {
     expect(find.text('Grill'), findsOneWidget);
     expect(find.byType(MaterialBanner), findsNothing);
 
-    // A day that was never downloaded explains why it's missing.
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Sat 24'));
+    // A day that was never downloaded (three are, by default) explains why
+    // it's missing.
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Sun 25'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Sun 25'));
     await tester.pumpAndSettle();
     expect(find.text('Menu not saved for offline use'), findsOneWidget);
   });
@@ -311,10 +355,20 @@ void main() {
     expect(find.text('Sign-in expired · balances saved just now'), findsOneWidget);
     expect(find.text('Sign in again to update'), findsOneWidget);
 
-    // Signing out forgets everything.
+    // Back in: recent meal swipes from the page's transaction search.
     source.page = _signedInPage;
+    source.history = File('test/fixtures/meal_plan_search_meal_ticks.json').readAsStringSync();
     await controller.refresh();
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Recent activity'), 100,
+        scrollable: find.byType(Scrollable).last);
+    await tester.scrollUntilVisible(find.text('ISR').first, 100,
+        scrollable: find.byType(Scrollable).last);
+    expect(find.textContaining(RegExp(r'^1:37\sPM · Meal$')), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget, reason: 'grouped by day');
+    _expectNoEllipsis(tester);
+
+    // Signing out forgets everything.
     await tester.scrollUntilVisible(find.text('Sign out of University Housing'), 100,
         scrollable: find.byType(Scrollable).last);
     await tester.tap(find.text('Sign out of University Housing'));
@@ -324,6 +378,26 @@ void main() {
     expect(source.signedOut, isTrue);
     expect(find.text('Sign in with NetID'), findsOneWidget);
     expect(find.text(r'$43.50'), findsNothing);
+  });
+
+  testWidgets('saves three days of menus unless set otherwise', (tester) async {
+    final harness = _Harness();
+    await harness.pump(tester);
+    final halls = demoHalls.length;
+    expect(await harness.repository.cachedMenuCount(), halls * 3);
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text("Today and the next 2 days, whenever you're online"), findsOneWidget);
+    await tester.tap(find.text('Save menus automatically'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Today and the next 4 days'));
+    await tester.pumpAndSettle();
+    expect(find.text("Today and the next 4 days, whenever you're online"), findsOneWidget);
+    expect(await harness.repository.cachedMenuCount(), halls * 5,
+        reason: 'the extra days are fetched right away');
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt('offline_menu_days'), 5);
   });
 
   testWidgets('settings opens sign-in diagnostics', (tester) async {
@@ -419,10 +493,20 @@ void main() {
     await tester.pumpAndSettle();
 
     final balance = demoBalanceFor(_now);
-    expect(find.text('Meals'), findsOneWidget);
+    final cards = find.byType(Card);
+    expect(find.descendant(of: cards, matching: find.text('Meals')), findsOneWidget);
     expect(find.text('${balance.mealSwipesRemaining}'), findsOneWidget);
-    expect(find.text('Dining Dollars'), findsOneWidget);
+    expect(find.descendant(of: cards, matching: find.text('Dining Dollars')), findsOneWidget);
     expect(find.text(formatCurrency(balance.diningDollars)), findsOneWidget);
+
+    // Recent activity, newest first, filterable by kind.
+    await tester.scrollUntilVisible(find.text('Recent activity'), 100,
+        scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Dining Dollars'));
+    await tester.pumpAndSettle();
+    expect(find.text('Terrabyte'), findsWidgets);
+    expect(find.text('1 meal'), findsNothing);
+    _expectNoEllipsis(tester);
   });
 
   testWidgets('follows the system dark mode setting', (tester) async {
@@ -496,10 +580,14 @@ $0
 /// a sign-in.
 class _FakeHousingSource implements BalancePageSource {
   String? page;
+
+  /// The "MealTicks" search response to hand back with the page.
+  String? history;
   bool signedOut = false;
 
   @override
-  Future<String> loadBalancePageText() async => page ?? (throw const SignInRequired());
+  Future<BalancePage> loadBalancePage() async =>
+      BalancePage(page ?? (throw const SignInRequired()), mealSwipesJson: history);
 
   @override
   Future<void> signOut() async {

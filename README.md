@@ -21,17 +21,21 @@ in the basement of your residence hall gives out.
   location is open, its card lists the stations serving right now. Menus open on the meal being
   served now, with stations collapsed so you can expand just what you want, and you can browse
   the next 7 days.
-- **Dietary filters:** Vegan, Vegetarian, Halal, Kosher and Jain filters, kept between launches.
-  Only diets that appear on the current menu are offered. Every item lists what it contains
-  (gluten, milk, eggs, soy, nuts…).
+- **Filters:** the filters button on a menu (between hours and the star) opens a sheet to show
+  only Vegan, Vegetarian, Halal, Kosher or Jain items, and to hide items containing chosen
+  ingredients (milk, eggs, gluten, peanuts, pork…). Filters are kept between launches and a line
+  above the menu says which are on. Only diets that appear on the current menu are offered.
+  Every item lists what it contains. Hiding goes by the ingredients Housing lists, which can be
+  incomplete, so it's never a "free from" guarantee.
 - **Campus time:** hours and dates are always shown in Champaign time, whatever time zone the
   phone is set to.
 - **Favorites:** star any location to pin it to the top of the list and to the Favorites tab.
   Favorites are stored on the device.
 - **Offline menus:** every screen first shows what's saved on the device, then refreshes from the
   network.
-  - Today's and tomorrow's menus for every location are downloaded automatically, favorites first.
-  - Settings can download the whole week.
+  - Menus for every location are downloaded automatically, favorites first: today and the next
+    2 days by default, or from 1 to 7 days as set in Settings.
+  - Settings can also download the whole week at once.
   - A quiet status line always says when the data on screen was updated, or that you're
     offline and when it was saved.
   - While offline, the app retries when the network connection changes, when it returns to the
@@ -41,7 +45,8 @@ in the basement of your residence hall gives out.
 - **Meal plan balances:** remaining meals, Dining Dollars and Illini Cash from your University
   Housing account, summarized in a compact strip at the top of the Dining tab, with progress bars against your weekly allowance. Sign in once with your
   NetID; balances refresh in the background and stay viewable offline. When the University ends
-  the session, the saved numbers stay up with a prompt to sign in again.
+  the session, the saved numbers stay up with a prompt to sign in again. The Balances tab also
+  shows the last 30 days of meal swipes and Dining Dollars purchases and rollovers, by day.
 - **Light and dark mode:** Illini Orange and Illini Blue themes that follow the system setting.
 
 Planned features and ideas are tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -150,7 +155,7 @@ How the feed maps to the app:
 - **Nutrition:** the feed also has `/Nutrition/{ItemID}`, which the app doesn't use yet.
 
 The app is light on the feed. It makes one request for the location list, plus one per menu: the
-menus you open, and today's and tomorrow's menus fetched in batches of four. Requests carry a
+menus you open, and the days saved for offline use (3 by default) fetched in batches of four. Requests carry a
 `User-Agent` naming this project.
 
 The server's certificate chains to *emSign Root CA - G1*, which current iOS and Android trust.
@@ -187,6 +192,14 @@ page students see in a browser:
   page. Plan names like `CLASSIC 10/45 D$` give the weekly allowance (10 meals, $45 Dining
   Dollars). Meals don't roll over; Dining Dollars roll over up to two weeks' worth, so that
   plan's bar measures against $90.
+- **Transaction history:** the page's own transaction search is a POST to
+  `/MyHousing/api/MealPlanBalances/Search` with
+  `{"StartDate": "2026-10-18", "EndDate": "2026-10-23", "SearchType": "MealTicks"}` (or
+  `"DiningDollars"`). Once the balances page has loaded, the app runs that same request from the
+  page (so it carries the page's cookies, plus its anti-forgery token if there is one) for the
+  last 30 days, and parses the JSON (`parseMealSwipes`, `parseDiningDollars`). Dates are campus
+  time. If the search fails, balances still update and diagnostics notes why.
+  `test/fixtures/meal_plan_search_*.json` are real responses.
 - **Staying signed in (Android):** Android's WebView already keeps session cookies across
   restarts; `MainActivity` flushes them to disk after sign-in and whenever the app is paused.
 - **Staying signed in (iOS):** on iOS, a WebView keeps cookies that have an expiry date but drops
@@ -236,7 +249,7 @@ flutter run \
 | --- | --- |
 | `GET /halls` | `[DiningHall]` |
 | `GET /halls/{id}/menu?date=yyyy-MM-dd` | `DailyMenu` |
-| `GET /balances` | `MealPlanBalance` |
+| `GET /balances` | `MealPlanBalance`, optionally with `transactions` (`BalanceTransaction`) |
 
 The JSON shapes are the `toJson()` methods in `lib/models/`. For example, a menu item is
 `{"name": "Chana Masala", "tags": ["vegan", "glutenFree"], "calories": 310}`. Hours are

@@ -28,8 +28,9 @@ class AppConfig {
   /// Balances read from University Housing's site after a NetID sign-in.
   static bool get useHousingBalances => !useSampleData && !useCustomBackend;
 
-  /// How many days ahead (including today) to keep menus saved for offline use.
-  static const prefetchDays = 2;
+  /// How many days (including today) of menus to save for offline use, until
+  /// the student picks another number in Settings.
+  static const defaultOfflineDays = 3;
 
   /// Days available in the menu date picker.
   static const browseDays = 7;

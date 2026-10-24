@@ -6,6 +6,7 @@ import '../data/demo_dining_api.dart';
 import '../data/dining_repository.dart';
 import '../data/sign_in_log.dart';
 import '../state/controllers.dart';
+import '../state/user_prefs.dart';
 import '../widgets/formatting.dart';
 import 'sign_in_diagnostics_screen.dart';
 
@@ -65,6 +66,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ));
   }
 
+  /// "Today only", "Today and tomorrow", "Today and the next 2 days"…
+  static String offlineDaysLabel(int days) => switch (days) {
+        1 => 'Today only',
+        2 => 'Today and tomorrow',
+        _ => 'Today and the next ${days - 1} days',
+      };
+
+  Future<void> _chooseOfflineDays() async {
+    final prefs = context.read<UserPrefs>();
+    final halls = context.read<HallsController>();
+    final days = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Save menus automatically'),
+        children: [
+          RadioGroup<int>(
+            groupValue: prefs.offlineDays,
+            onChanged: (value) => Navigator.pop(context, value),
+            child: Column(
+              children: [
+                for (var i = 1; i <= AppConfig.browseDays; i++)
+                  RadioListTile<int>(value: i, title: Text(offlineDaysLabel(i))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (days == null || days == prefs.offlineDays) return;
+    final more = days > prefs.offlineDays;
+    await prefs.setOfflineDays(days);
+    // Fetch the newly included days now rather than at the next refresh.
+    if (more) await halls.syncMenus();
+  }
+
   Future<void> _clearCache() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -87,6 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final halls = context.watch<HallsController>();
+    final offlineDays = context.select<UserPrefs, int>((p) => p.offlineDays);
     final demoApi = context.watch<DemoDiningApi?>();
     final signInLog = context.read<SignInLog?>();
     final brightness = MediaQuery.platformBrightnessOf(context);
@@ -123,13 +160,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.event_repeat_rounded),
+            title: const Text('Save menus automatically'),
+            subtitle: Text("${offlineDaysLabel(offlineDays)}, whenever you're online"),
+            onTap: _chooseOfflineDays,
+          ),
+          ListTile(
             leading: halls.syncing
                 ? const SizedBox.square(
                     dimension: 24, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.cloud_download_outlined),
             title: const Text("Download this week's menus"),
-            subtitle: const Text(
-                "Today's and tomorrow's menus are saved automatically when you're online."),
+            subtitle: const Text('Saves every menu for the week ahead now.'),
             enabled: !halls.syncing,
             onTap: _downloadWeek,
           ),

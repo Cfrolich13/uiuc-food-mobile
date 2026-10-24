@@ -352,5 +352,38 @@ MealPlanBalance demoBalanceFor(DateTime now) {
     mealSwipesTotal: swipesTotal,
     diningDollars: dollarsLeft.clamp(0, dollarsTotal),
     diningDollarsTotal: dollarsTotal,
+    transactions: demoTransactionsFor(now),
   );
+}
+
+/// About two meals and a café stop a day over the past two weeks.
+List<BalanceTransaction> demoTransactionsFor(DateTime now) {
+  const halls = ['ISR', 'Ikenberry', 'PAR', 'LAR'];
+  const prices = [3.49, 4.29, 4.99, 5.99, 6.49];
+  final all = <BalanceTransaction>[];
+  for (var daysAgo = 0; daysAgo < 14; daysAgo++) {
+    final day = DateTime(now.year, now.month, now.day - daysAgo);
+    final seed = _stableHash('${day.month}-${day.day}');
+    BalanceTransaction meal(int hour, int minute) => BalanceTransaction(
+          kind: TransactionKind.mealSwipe,
+          time: day.add(Duration(hours: hour, minutes: minute)),
+          location: halls[(seed + hour) % halls.length],
+          description: 'Meal',
+        );
+    all.addAll([
+      meal(12, seed % 40),
+      if (seed % 3 != 0) meal(18, seed % 50),
+      BalanceTransaction(
+        kind: TransactionKind.diningDollars,
+        time: day.add(Duration(hours: 9, minutes: seed % 55)),
+        location: 'Terrabyte',
+        description: 'Purchase',
+        amount: -prices[seed % prices.length],
+      ),
+    ]);
+  }
+  return [
+    for (final t in all..sort((a, b) => b.time.compareTo(a.time)))
+      if (!t.time.isAfter(now)) t,
+  ];
 }

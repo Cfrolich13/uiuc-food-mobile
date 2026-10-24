@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../config.dart';
+import '../data/housing_balance_api.dart';
 import '../models/balance.dart';
 import '../state/controllers.dart';
 import '../theme/app_theme.dart';
@@ -93,6 +94,10 @@ class BalancesScreen extends StatelessWidget {
         if (balance.illiniCash != null) ...[
           const SizedBox(height: 12),
           _IlliniCashRow(amount: balance.illiniCash!),
+        ],
+        if (balance.transactions != null) ...[
+          const SizedBox(height: 24),
+          _Activity(transactions: balance.transactions!),
         ],
         const SizedBox(height: 24),
         if (AppConfig.useSampleBalances)
@@ -297,6 +302,133 @@ class _InfoNote extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Recent meal swipes and Dining Dollars activity, newest first, by day.
+class _Activity extends StatefulWidget {
+  const _Activity({required this.transactions});
+
+  final List<BalanceTransaction> transactions;
+
+  @override
+  State<_Activity> createState() => _ActivityState();
+}
+
+class _ActivityState extends State<_Activity> {
+  static const _page = 20;
+
+  /// Null shows both kinds.
+  TransactionKind? _kind;
+  int _shown = _page;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final now = context.read<Clock>().now();
+    final matching = [
+      for (final t in widget.transactions)
+        if (_kind == null || t.kind == _kind) t,
+    ];
+    final shown = matching.take(_shown).toList();
+
+    final rows = <Widget>[];
+    DateTime? day;
+    for (final t in shown) {
+      final d = DateTime(t.time.year, t.time.month, t.time.day);
+      if (d != day) {
+        day = d;
+        rows.add(Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 2, left: 4),
+          child: Text(formatDay(d, now), style: theme.textTheme.labelLarge),
+        ));
+      }
+      rows.add(_TransactionRow(transaction: t));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Recent activity', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        // Chips wrap on narrow phones rather than cutting labels short.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final (kind, label) in const [
+              (null, 'All'),
+              (TransactionKind.mealSwipe, 'Meals'),
+              (TransactionKind.diningDollars, 'Dining Dollars'),
+            ])
+              ChoiceChip(
+                label: Text(label),
+                selected: _kind == kind,
+                onSelected: (_) => setState(() {
+                  _kind = kind;
+                  _shown = _page;
+                }),
+              ),
+          ],
+        ),
+        if (matching.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12, left: 4),
+            child: Text('Nothing in the last ${HousingBalanceApi.historyDays} days.',
+                style: muted),
+          ),
+        ...rows,
+        if (matching.length > shown.length)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => setState(() => _shown += _page),
+              child: const Text('Show more'),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TransactionRow extends StatelessWidget {
+  const _TransactionRow({required this.transaction});
+
+  final BalanceTransaction transaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final t = transaction;
+    final meal = t.kind == TransactionKind.mealSwipe;
+    final amount = t.amount;
+    final value = meal
+        ? '1 meal'
+        : amount == null
+            ? ''
+            : '${amount > 0 ? '+' : amount < 0 ? '−' : ''}${formatCurrency(amount.abs())}';
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      leading: Icon(
+        meal ? Icons.restaurant_menu_rounded : Icons.account_balance_wallet_outlined,
+        color: scheme.primary,
+      ),
+      title: Text(t.location.isEmpty ? t.description : t.location,
+          style: theme.textTheme.bodyLarge),
+      subtitle: Text(
+        [formatTime(t.time), if (t.location.isNotEmpty) t.description].join(' · '),
+        style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+      ),
+      trailing: Text(
+        value,
+        style: theme.textTheme.titleSmall?.copyWith(
+          color: amount != null && amount > 0 ? AppTheme.openColor(context) : null,
+        ),
+      ),
     );
   }
 }
