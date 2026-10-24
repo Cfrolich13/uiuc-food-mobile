@@ -67,6 +67,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  assets:
+    # The Map tab's dark style; regenerate with tool/make_dark_map_style.dart.
+    - assets/map/dark.json
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

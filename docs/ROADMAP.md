@@ -62,6 +62,10 @@ Decided against for now. If revisited, host on the owner's `web.illinois.edu` si
 
 ## Watch
 
+- **OpenFreeMap's style URLs.** The bundled dark map style (`assets/map/dark.json`) copies
+  Liberty's tile, font and sprite URLs (the sprite URL is versioned, e.g. `ofm_f384`). If
+  OpenFreeMap retires them, dark mode loses icons or tiles; rerun
+  `dart run tool/make_dark_map_style.dart` and commit the result.
 - **emSign Root CA - G1 (the University certificate root).** After eMudhra's October 2026 key
   compromise (other intermediates, not the University's), Chrome said it is reviewing its trust
   in this root. If it's distrusted, the University will need certificates from another CA, and

@@ -5,14 +5,21 @@ import 'package:maplibre_gl/maplibre_gl.dart' as maplibre;
 
 import '../models/dining_hall.dart';
 
-/// Map styles from OpenFreeMap: vector tiles built from OpenStreetMap data,
-/// with no API key. Its terms allow downloading areas for offline use (at most
-/// 3,000 tiles or 50 MB each, 4 requests at a time, with a User-Agent naming
-/// the app). tile.openstreetmap.org forbids offline use, so don't switch to it.
+/// Map styles. Light is OpenFreeMap's "liberty": vector tiles built from
+/// OpenStreetMap data, with no API key. Dark is generated from it by
+/// `tool/make_dark_map_style.dart` and bundled; it only changes colors, so it
+/// loads the same tiles, fonts and icons, and the offline download of liberty
+/// covers both.
+///
+/// OpenFreeMap's terms allow downloading areas for offline use (at most 3,000
+/// tiles or 50 MB each, 4 requests at a time, with a User-Agent naming the
+/// app). tile.openstreetmap.org forbids offline use, so don't switch to it.
 abstract final class CampusMapStyles {
   static const light = 'https://tiles.openfreemap.org/styles/liberty';
-  static const dark = 'https://tiles.openfreemap.org/styles/dark';
-  static const all = [light, dark];
+  static const dark = 'assets/map/dark.json';
+
+  /// Styles to download for offline use.
+  static const offline = [light];
 
   static String forBrightness(Brightness brightness) =>
       brightness == Brightness.dark ? dark : light;

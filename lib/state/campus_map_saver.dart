@@ -6,8 +6,8 @@ import '../models/dining_hall.dart';
 import 'controllers.dart';
 
 /// Keeps the campus map saved for offline use: after the location list loads
-/// from the network, downloads the area around every location in the light
-/// and dark map styles, then again about monthly or when locations move.
+/// from the network, downloads the area around every location, then again
+/// about monthly or when locations move.
 class CampusMapSaver extends ChangeNotifier {
   CampusMapSaver(this._prefs, this._regions, this._halls, {DateTime Function()? now})
       : _now = now ?? DateTime.now {
@@ -57,7 +57,7 @@ class CampusMapSaver extends ChangeNotifier {
     }
     _saving = true;
     try {
-      for (final style in CampusMapStyles.all) {
+      for (final style in CampusMapStyles.offline) {
         await regions.save(bounds, style);
       }
       await _prefs.setInt(_savedAtKey, _now().millisecondsSinceEpoch);

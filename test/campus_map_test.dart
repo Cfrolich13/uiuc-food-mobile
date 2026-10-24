@@ -70,23 +70,23 @@ void main() {
       now = DateTime(2026, 10, 24);
     });
 
-    test('saves both styles once the locations load, then not again for a month', () async {
+    test('saves the map once the locations load, then not again for a month', () async {
       final saver = CampusMapSaver(prefs, regions, halls, now: () => now);
       expect(regions.saved, isEmpty, reason: 'nothing loaded yet');
 
       await halls.refresh();
       await pumpEventQueue();
-      expect(regions.saved.map((r) => r.$2), CampusMapStyles.all);
+      expect(regions.saved.map((r) => r.$2), CampusMapStyles.offline);
       expect(saver.savedAt, now);
 
       await halls.refresh();
       await pumpEventQueue();
-      expect(regions.saved, hasLength(2));
+      expect(regions.saved, hasLength(1));
 
       now = now.add(const Duration(days: 31));
       await halls.refresh();
       await pumpEventQueue();
-      expect(regions.saved, hasLength(4));
+      expect(regions.saved, hasLength(2));
     });
 
     test('a failed download is tried again on the next load', () async {
@@ -98,7 +98,7 @@ void main() {
       regions.fail = false;
       await halls.refresh();
       await pumpEventQueue();
-      expect(regions.saved, hasLength(2));
+      expect(regions.saved, hasLength(1));
       expect(saver.savedAt, now);
     });
   });

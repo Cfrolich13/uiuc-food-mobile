@@ -40,7 +40,9 @@ class CampusMapView extends StatefulWidget {
 
 class _CampusMapViewState extends State<CampusMapView> {
   MapLibreMapController? _controller;
+  /// Whether the pin layers are on the current style.
   bool _styleLoaded = false;
+  Brightness? _brightness;
   bool _fitted = false;
   bool _showLocation = false;
 
@@ -69,54 +71,102 @@ class _CampusMapViewState extends State<CampusMapView> {
           a[i].isOpen == b[i].isOpen &&
           a[i].place.halls.length == b[i].place.halls.length);
 
+  static const _source = 'dining';
+  static const _pinLayer = 'dining-pins';
+  static const _labelLayer = 'dining-labels';
+
   void _onMapCreated(MapLibreMapController controller) {
     _controller = controller;
-    controller.onCircleTapped.add((circle) => _onTap(circle.data));
+    controller.onFeatureTapped.add((point, coordinates, id, layerId, annotation) {
+      if (layerId != _pinLayer && layerId != _labelLayer) return;
+      for (final pin in widget.pins) {
+        if (pin.place.id == id) return widget.onPinTap(pin);
+      }
+    });
   }
 
-  void _onTap(Map<dynamic, dynamic>? data) {
-    final id = data?['place'];
-    for (final pin in widget.pins) {
-      if (pin.place.id == id) return widget.onPinTap(pin);
-    }
-  }
-
+  /// Runs after every style load, including the reload when the theme
+  /// changes, which drops the layers added before.
   Future<void> _onStyleLoaded() async {
-    _styleLoaded = true;
+    final controller = _controller;
+    if (controller == null || !mounted) return;
     if (!_fitted) {
       _fitted = true;
       final bounds = MapBounds.around(widget.pins.map((p) => p.place));
       if (bounds != null) {
-        await _controller?.moveCamera(CameraUpdate.newLatLngBounds(bounds.toLatLngBounds(),
-            left: 48, top: 48, right: 48, bottom: 96));
+        // Extra room on the right for the labels beside the pins.
+        await controller.moveCamera(CameraUpdate.newLatLngBounds(bounds.toLatLngBounds(),
+            left: 64, top: 48, right: 120, bottom: 96));
       }
     }
-    await _drawPins();
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    final open = _hex(AppTheme.openColor(context));
+    final surface = _hex(theme.colorScheme.surface);
+    await controller.addGeoJsonSource(_source, _features(), promoteId: 'place');
+    await controller.addCircleLayer(
+      _source,
+      _pinLayer,
+      CircleLayerProperties(
+        // Bigger where several locations share a building.
+        circleRadius: ['case', ['get', 'shared'], 12, 9],
+        circleColor: ['case', ['get', 'open'], open, _hex(theme.colorScheme.outline)],
+        circleStrokeWidth: 3,
+        circleStrokeColor: surface,
+      ),
+    );
+    await controller.addSymbolLayer(
+      _source,
+      _labelLayer,
+      SymbolLayerProperties(
+        textField: ['get', 'label'],
+        // One of the fonts OpenFreeMap serves.
+        textFont: ['Noto Sans Bold'],
+        textSize: 13,
+        textColor: ['case', ['get', 'open'], open, _hex(theme.colorScheme.onSurface)],
+        textHaloColor: surface,
+        textHaloWidth: 1.5,
+        textVariableAnchor: ['left', 'right', 'top', 'bottom'],
+        textRadialOffset: 1.2,
+        textJustify: 'auto',
+        // Long names wrap rather than being cut off.
+        textMaxWidth: 9,
+        // Open places keep their labels when labels collide.
+        symbolSortKey: ['case', ['get', 'open'], 0, 1],
+      ),
+    );
+    _styleLoaded = true;
   }
 
   Future<void> _drawPins() async {
-    final controller = _controller;
-    if (controller == null || !_styleLoaded || !mounted) return;
-    final theme = Theme.of(context);
-    final open = _hex(AppTheme.openColor(context));
-    final closed = _hex(theme.colorScheme.outline);
-    final stroke = _hex(theme.colorScheme.surface);
-    final pins = widget.pins;
-    await controller.clearCircles();
-    await controller.addCircles([
-      for (final pin in pins)
-        CircleOptions(
-          geometry: LatLng(pin.place.latitude, pin.place.longitude),
-          // Bigger where several locations share a building.
-          circleRadius: pin.place.halls.length > 1 ? 13 : 10,
-          circleColor: pin.isOpen ? open : closed,
-          circleStrokeWidth: 3,
-          circleStrokeColor: stroke,
-        ),
-    ], [
-      for (final pin in pins) {'place': pin.place.id},
-    ]);
+    if (!_styleLoaded) return;
+    try {
+      await _controller?.setGeoJsonSource(_source, _features());
+    } catch (e) {
+      // The style is reloading; its load adds the current pins.
+      debugPrint('Map pins not updated: $e');
+    }
   }
+
+  Map<String, dynamic> _features() => {
+        'type': 'FeatureCollection',
+        'features': [
+          for (final pin in widget.pins)
+            {
+              'type': 'Feature',
+              'geometry': {
+                'type': 'Point',
+                'coordinates': [pin.place.longitude, pin.place.latitude],
+              },
+              'properties': {
+                'place': pin.place.id,
+                'open': pin.isOpen,
+                'shared': pin.place.halls.length > 1,
+                'label': pin.place.halls.map((h) => h.shortName).join('\n'),
+              },
+            },
+        ],
+      };
 
   static String _hex(Color color) =>
       '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
@@ -153,12 +203,17 @@ class _CampusMapViewState extends State<CampusMapView> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
+    // A new style is loading, without the pin layers until it's done.
+    if (brightness != _brightness) _styleLoaded = false;
+    _brightness = brightness;
     return Stack(
       children: [
         Semantics(
           label: 'Map of dining locations. The Dining tab lists the same locations.',
           child: MapLibreMap(
             styleString: CampusMapStyles.forBrightness(brightness),
+            // The pins are style layers, not annotations.
+            annotationOrder: const [],
             // Champaign-Urbana campus; replaced by a fit to the pins once the
             // style loads.
             initialCameraPosition:
@@ -166,7 +221,6 @@ class _CampusMapViewState extends State<CampusMapView> {
             minMaxZoomPreference: const MinMaxZoomPreference(11, 19),
             tiltGesturesEnabled: false,
             myLocationEnabled: _showLocation,
-            annotationOrder: const [AnnotationType.circle],
             attributionButtonPosition: AttributionButtonPosition.bottomLeft,
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,

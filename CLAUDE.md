@@ -32,7 +32,7 @@ On machines whose CA store lacks *emSign Root CA - G1* (the University server's 
 it), pass `--ca-file=<pem>` to `tool/live_feed_check.dart`. Dart ignores `SSL_CERT_FILE`.
 
 CI (`.github/workflows/build.yml`) runs analyze + test once, then builds an unsigned `.ipa`
-(macOS) and a release `.apk` (Linux) in parallel, uploaded unarchived. The APK is signed with the
+(macOS) and a release `.apk` (Linux, JDK 21, which `maplibre_gl` needs) in parallel, uploaded unarchived. The APK is signed with the
 key from `ANDROID_KEYSTORE_*` secrets if set, else the debug key. Android `minSdk` is 30 because
 older versions don't trust the University's certificate root (emSign Root CA - G1). The iOS
 Swift code in `ios/Runner/AppDelegate.swift` is only compiled there, so CI is the check for it.
@@ -74,9 +74,13 @@ Lunch and Field of Greens), which `statusAt` handles. `test/fixtures/` holds rea
 responses.
 
 **Map** (`screens/map_screen.dart`, `widgets/campus_map_view.dart`, `data/campus_map.dart`).
-MapLibre (`maplibre_gl`) with OpenFreeMap vector tiles; no API key. `groupByPlace` puts locations
-sharing a building on one pin; tapping it opens a sheet of `HallCard`s. `CampusMapSaver` downloads
-the campus area in both styles for offline use after halls load, then monthly. OpenFreeMap allows
+MapLibre (`maplibre_gl`) with OpenFreeMap vector tiles; no API key. Light is OpenFreeMap's
+`liberty`; dark is `assets/map/dark.json`, generated from it by `tool/make_dark_map_style.dart`
+(colors only, same tile/font/sprite URLs, so one offline download covers both; edit the palette
+there, never the JSON). Pins and their names are style layers on a GeoJSON source (`dining`),
+not annotations. `groupByPlace` puts locations sharing a building on one pin; tapping it opens a
+sheet of `HallCard`s. `CampusMapSaver` downloads the campus area for offline use after halls
+load, then monthly. OpenFreeMap allows
 offline downloads of at most 3,000 tiles / 50 MB, 4 requests at a time, with a User-Agent naming the
 app (`configureMapNetwork`); never use `tile.openstreetmap.org`, whose policy forbids offline use.
 Location permission is asked only when "Show my location" is tapped. The map is a native view, so
