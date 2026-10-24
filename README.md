@@ -197,7 +197,7 @@ page students see in a browser:
   `{"StartDate": "2026-10-18", "EndDate": "2026-10-23", "SearchType": "MealTicks"}` (or
   `"DiningDollars"`). Once the balances page has loaded, the app runs that same request from the
   page (so it carries the page's cookies, plus its anti-forgery token if there is one) for the
-  last 30 days, and parses the JSON (`parseMealSwipes`, `parseDiningDollars`). Dates are campus
+  last 30 days, ending tomorrow because the search leaves out the end date's own transactions, and parses the JSON (`parseMealSwipes`, `parseDiningDollars`). Dates are campus
   time. If the search fails, balances still update and diagnostics notes why.
   `test/fixtures/meal_plan_search_*.json` are real responses.
 - **Staying signed in (Android):** Android's WebView already keeps session cookies across

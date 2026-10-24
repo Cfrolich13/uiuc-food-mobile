@@ -68,7 +68,9 @@ Future<BalancePage> readBalancePage(
   String day(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   final start = day(DateTime(today.year, today.month, today.day - HousingBalanceApi.historyDays));
-  final end = day(today);
+  // The search leaves out the end date's own transactions, so end tomorrow
+  // to include today's.
+  final end = day(DateTime(today.year, today.month, today.day + 1));
   try {
     final history = await _searchHistory(controller, start, end);
     final swipes = history['mealTicks']!;
