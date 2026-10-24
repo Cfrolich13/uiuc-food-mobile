@@ -22,6 +22,12 @@ flutter run --dart-define=USE_SAMPLE_DATA=true    # built-in sample data, works 
 dart run tool/live_feed_check.dart                # hits the live feed, checks it still parses
 ```
 
+Before every commit, run `flutter analyze` and `flutter test` (and the `TZ=Asia/Kolkata` run when
+dates or times change) and commit only when they pass; don't rely on CI to catch failures. In a
+cloud session without Flutter, run `tool/cloud_setup.sh` first (it is also the environment's setup
+script). Note that `intl` puts a narrow no-break space (` `) before AM/PM, so expected times
+in tests need it.
+
 On machines whose CA store lacks *emSign Root CA - G1* (the University server's root; phones trust
 it), pass `--ca-file=<pem>` to `tool/live_feed_check.dart`. Dart ignores `SSL_CERT_FILE`.
 

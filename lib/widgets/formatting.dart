@@ -50,9 +50,10 @@ String describeStatus(OpenStatus status, DateTime now) {
   }
   if (next == null) return 'Closed';
   final sameDay = next.year == now.year && next.month == now.month && next.day == now.day;
-  final when = sameDay ? formatTime(next) : '${_dayPhrase(next, now)} at ${formatTime(next)}';
+  final at = 'at ${formatTime(next)}';
+  final when = sameDay ? at : '${_dayPhrase(next, now)} $at';
   final meal = _meaningfulMeal(status.nextMeal);
-  return meal == null ? 'Closed · Opens $when' : 'Closed · $meal at $when';
+  return meal == null ? 'Closed · Opens $when' : 'Closed · $meal $when';
 }
 
 /// "tomorrow" or "on Fri, Oct 24", to read mid-sentence before "at 9:00 AM".

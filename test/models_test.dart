@@ -114,12 +114,13 @@ void main() {
   });
 
   test('describeStatus phrases the next opening for later days', () {
+    // intl separates the time and AM/PM with a narrow no-break space.
     String closed(DateTime next, [String? meal]) =>
         describeStatus(OpenStatus(isOpen: false, nextChange: next, nextMeal: meal), thu(22));
-    expect(closed(thu(23), 'Late Night'), 'Closed · Late Night at 11:00 PM');
+    expect(closed(thu(23), 'Late Night'), 'Closed · Late Night at 11:00\u202fPM');
     expect(closed(DateTime(2026, 10, 23, 9), 'Continental Breakfast'),
-        'Closed · Continental Breakfast tomorrow at 9:00 AM');
-    expect(closed(DateTime(2026, 10, 23, 9)), 'Closed · Opens tomorrow at 9:00 AM');
-    expect(closed(DateTime(2026, 10, 25, 9), 'Brunch'), 'Closed · Brunch on Sun, Oct 25 at 9:00 AM');
+        'Closed · Continental Breakfast tomorrow at 9:00\u202fAM');
+    expect(closed(DateTime(2026, 10, 23, 9)), 'Closed · Opens tomorrow at 9:00\u202fAM');
+    expect(closed(DateTime(2026, 10, 25, 9), 'Brunch'), 'Closed · Brunch on Sun, Oct 25 at 9:00\u202fAM');
   });
 }
