@@ -71,27 +71,51 @@ Future<BalancePage> readBalancePage(
   final end = day(today);
   try {
     final history = await _searchHistory(controller, start, end);
-    record?.note('read transaction history');
-    return BalancePage(
-      text,
-      mealSwipesJson: history['mealTicks'] as String?,
-      diningDollarsJson: history['diningDollars'] as String?,
-    );
+    final swipes = history['mealTicks']!;
+    final dollars = history['diningDollars']!;
+    record?.note('transaction history: meals ${swipes.summary}; '
+        'Dining Dollars ${dollars.summary}');
+    return BalancePage(text, mealSwipesJson: swipes.body, diningDollarsJson: dollars.body);
   } catch (e) {
     record?.note("couldn't read transaction history: $e");
     return BalancePage(text);
   }
 }
 
-/// Runs the page's transaction search for both kinds. Scripts can't hand
-/// back a promise's result directly, so the search stores it on the page and
-/// this polls for it.
-Future<Map<String, Object?>> _searchHistory(
+/// One search response. [body] is null unless the request succeeded.
+class _SearchResult {
+  _SearchResult(Map<String, Object?> json)
+      : status = json['status'] as int?,
+        type = json['type'] as String?,
+        path = json['path'] as String?,
+        body = json['status'] == 200 ? json['body'] as String? : null;
+
+  final int? status;
+  final String? type;
+  final String? path;
+  final String? body;
+
+  /// e.g. "HTTP 200 application/json, 6 entries"; never the contents.
+  String get summary => [
+        'HTTP $status${type == null || type!.isEmpty ? '' : ' ${type!.split(';').first}'}',
+        if (path != null && path != HousingBalanceApi.searchPath) 'ended at $path',
+        if (body != null) HousingBalanceApi.describeHistory(body!),
+      ].join(', ');
+}
+
+/// Runs the page's transaction search for both kinds, the way the page's own
+/// search does. Scripts can't hand back a promise's result directly, so the
+/// search stores it on the page and this polls for it.
+Future<Map<String, _SearchResult>> _searchHistory(
     WebViewController controller, String start, String end) async {
   await controller.runJavaScript('''
 (function () {
   window.__illiniDiningHistory = null;
-  var headers = {'Content-Type': 'application/json', 'Accept': 'application/json'};
+  var headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json, text/plain, */*',
+    'X-Requested-With': 'XMLHttpRequest'
+  };
   var token = document.querySelector('input[name="__RequestVerificationToken"]');
   if (token) headers['RequestVerificationToken'] = token.value;
   function search(type) {
@@ -99,8 +123,10 @@ Future<Map<String, Object?>> _searchHistory(
       method: 'POST', credentials: 'same-origin', headers: headers,
       body: JSON.stringify({StartDate: '$start', EndDate: '$end', SearchType: type})
     }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.text();
+      return r.text().then(function (body) {
+        return {status: r.status, type: r.headers.get('Content-Type'),
+                path: new URL(r.url).pathname, body: body};
+      });
     });
   }
   Promise.all([search('MealTicks'), search('DiningDollars')]).then(function (r) {
@@ -117,7 +143,10 @@ Future<Map<String, Object?>> _searchHistory(
     if (result == 'null' || result.isEmpty) continue;
     final json = jsonDecode(result) as Map<String, Object?>;
     if (json['error'] != null) throw DiningApiException('${json['error']}');
-    return json;
+    return {
+      for (final key in ['mealTicks', 'diningDollars'])
+        key: _SearchResult(json[key] as Map<String, Object?>),
+    };
   }
   throw const DiningApiException('timed out');
 }

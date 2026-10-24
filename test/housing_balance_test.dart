@@ -185,6 +185,20 @@ Dining Dollars
       expect(restored.transactions!.map((t) => t.toJson()), all.map((t) => t.toJson()));
     });
 
+    test('accepts the list wrapped in a JSON string or object', () {
+      expect(HousingBalanceApi.parseMealSwipes(jsonEncode(mealTicks)), hasLength(6));
+      expect(HousingBalanceApi.parseMealSwipes('{"data": $mealTicks}'), hasLength(6));
+    });
+
+    test('describes responses for diagnostics without their contents', () {
+      expect(HousingBalanceApi.describeHistory(mealTicks), '6 entries');
+      expect(HousingBalanceApi.describeHistory('<html>secret</html>'),
+          'not JSON (starts with "<", 19 chars)');
+      expect(HousingBalanceApi.describeHistory('{"error": "secret"}'),
+          'not a list of transactions (19 chars)');
+      expect(HousingBalanceApi.describeHistory('  '), 'empty');
+    });
+
     test('a failed or garbled search leaves only that history out', () {
       final one = HousingBalanceApi.parsePage(
           BalancePage(saved, mealSwipesJson: mealTicks, diningDollarsJson: '<html>'))!;

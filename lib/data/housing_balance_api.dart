@@ -97,7 +97,7 @@ class HousingBalanceApi implements BalanceApi {
   /// "2026-10-22T19:41:10", "Name": "CLASSIC 10/45 D$", "Meal": "6",
   /// "Amount": "0", …}]`. `Date` is campus time.
   static List<BalanceTransaction> parseMealSwipes(String json) => [
-        for (final entry in jsonDecode(json) as List)
+        for (final entry in _entries(json))
           if (_time(entry) case final time?)
             BalanceTransaction(
               kind: TransactionKind.mealSwipe,
@@ -111,7 +111,7 @@ class HousingBalanceApi implements BalanceApi {
   /// "2026-10-23T10:35:41", "Location": " TERRABYTE", "TransactionName":
   /// "Purchase", …}]`. Rollovers have an empty location.
   static List<BalanceTransaction> parseDiningDollars(String json) => [
-        for (final entry in jsonDecode(json) as List)
+        for (final entry in _entries(json))
           if (_time(entry) case final time?)
             BalanceTransaction(
               kind: TransactionKind.diningDollars,
@@ -122,8 +122,34 @@ class HousingBalanceApi implements BalanceApi {
             ),
       ];
 
-  static DateTime? _time(Object? entry) =>
-      entry is Map ? DateTime.tryParse('${entry['Date']}'.trim()) : null;
+  /// The entries of a search response: a JSON list, also accepted as a JSON
+  /// string holding the list or an object wrapping it (`{"data": […]}`).
+  static List<Map<dynamic, dynamic>> _entries(String json) {
+    Object? value = jsonDecode(json.trim());
+    if (value is String) value = jsonDecode(value);
+    if (value is Map) value = value.values.firstWhere((v) => v is List, orElse: () => null);
+    if (value is List) return value.whereType<Map<dynamic, dynamic>>().toList();
+    throw const FormatException('not a list of transactions');
+  }
+
+  /// What a search response looks like, for diagnostics, without its
+  /// contents: "6 entries", "not JSON (starts with "<")"…
+  static String describeHistory(String body) {
+    try {
+      final entries = _entries(body);
+      return '${entries.length} ${entries.length == 1 ? 'entry' : 'entries'}';
+    } on FormatException catch (e) {
+      final trimmed = body.trimLeft();
+      if (trimmed.isEmpty) return 'empty';
+      final first = trimmed[0];
+      return '{['.contains(first) || first == '"'
+          ? '${e.message} (${body.length} chars)'
+          : 'not JSON (starts with "$first", ${body.length} chars)';
+    }
+  }
+
+  static DateTime? _time(Map<dynamic, dynamic> entry) =>
+      DateTime.tryParse('${entry['Date']}'.trim());
 
   /// " TERRABYTE" → "Terrabyte"; short codes like "ISR" stay as they are.
   static String _place(Object? raw) {

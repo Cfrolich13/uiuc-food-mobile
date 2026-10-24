@@ -98,6 +98,12 @@ class BalancesScreen extends StatelessWidget {
         if (balance.transactions != null) ...[
           const SizedBox(height: 24),
           _Activity(transactions: balance.transactions!),
+        ] else if (controller.usesUniversitySignIn && !AppConfig.useSampleBalances) ...[
+          const SizedBox(height: 24),
+          const _InfoNote(
+            "Recent activity couldn't be loaded from University Housing. Pull down to try "
+            'again; Settings → Sign-in diagnostics shows why.',
+          ),
         ],
         const SizedBox(height: 24),
         if (AppConfig.useSampleBalances)
