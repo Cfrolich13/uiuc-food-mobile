@@ -67,6 +67,12 @@ replace weekly `ServiceHours`. `/Menu/{id}/{M-d-yyyy}` gives items: station = `S
 Lunch and Field of Greens), which `statusAt` handles. `test/fixtures/` holds real captured
 responses.
 
+The official Illinois app is open source (Flutter): https://github.com/rokwire/illinois-app, public,
+so `git clone --depth 1` works without attaching it. Check it for how the feed is meant to be used.
+Dining lives in `lib/model/Dining.dart`, `lib/ext/Dining.dart`, `lib/service/Dinings.dart` and
+`lib/ui/explore/ExploreDiningDetailPanel.dart`. It groups menus by `Category` (same as `ServingUnit`
+in practice) and parses `Course`/`CourseSort` but never displays them.
+
 **Balances** (`lib/data/housing_balance_api.dart`, `housing_webview.dart`,
 `screens/housing_sign_in_screen.dart`). There's no public balance API, so the app shows the
 student's own MyHousing "Meal Plan Balances" page in a WebView. The University redirects to its
