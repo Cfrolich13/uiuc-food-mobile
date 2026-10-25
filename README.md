@@ -1,17 +1,40 @@
 # Illini Dining
 
-A Flutter app focused entirely on food at the University of Illinois Urbana-Champaign. It takes the
-dining section of the Illinois app and gives it a dedicated home: see what every dining hall is
-serving, pin your favorites, check your meal plan balances, and keep reading menus when the Wi-Fi
-in the basement of your residence hall gives out.
+A Flutter app for food at the University of Illinois Urbana-Champaign: what every dining hall is
+serving, your favorites, and your meal plan balances. It reads the same University Housing menu
+feed as the official [Illinois app](https://github.com/rokwire/illinois-app), but it's built
+around dining alone.
 
 > Not an official University of Illinois app. Menus and hours come live from University Housing's
 > public feed; meal plan balances come from your own University Housing account after you sign
 > in with your NetID (see [Data sources](#data-sources)).
 
-| Dining list | Menu (dark) | Offline | Balances (dark) |
+## What it does better than the official app
+
+- **Works offline.** Menus for every location are saved ahead of time (3 days by default, up to
+  7), so they still open in a basement with no signal. A status line says when they were saved.
+  The official app downloads each menu when you open it.
+- **Dark mode.** Light and dark themes in Illini Orange and Illini Blue follow the system setting.
+  The official app has a light theme only.
+- **Menus that are easier to scan.** Stations start collapsed with a preview of what's in them,
+  and each station is split into its courses (Entrees, Starches, Vegetables…). The feed includes
+  those courses; the official app doesn't show them.
+- **What's open, at a glance.** Each card says whether the location is open, until when, and which
+  stations are serving right now. Favorites are pinned at the top and a meal plan summary sits
+  above the list.
+- **Filters that stick.** Show only Vegan, Vegetarian, Halal, Kosher or Jain items, or hide items
+  that contain chosen ingredients, from a sheet on any menu. Your choices are kept between
+  launches.
+- **Campus time everywhere.** Hours and dates are always Champaign time, even on a phone set to
+  another time zone.
+- **A campus map** of every dining location, saved for offline use.
+- **Nothing cut off.** Long names wrap instead of ending in "…".
+
+| Dining list, offline | Menu with courses (dark) | Filters | Balances (dark) |
 | --- | --- | --- | --- |
-| ![](docs/screenshots/1_list_light.png) | ![](docs/screenshots/2_menu_dark.png) | ![](docs/screenshots/5_offline_cached_light.png) | ![](docs/screenshots/6_balances_dark.png) |
+| ![](docs/screenshots/1_dining_offline_light.png) | ![](docs/screenshots/2_menu_dark.png) | ![](docs/screenshots/3_filters_light.png) | ![](docs/screenshots/4_balances_dark.png) |
+
+Screenshots are regenerated for each release (see [Screenshots](#screenshots)).
 
 ## Features
 
@@ -102,6 +125,19 @@ To try the offline experience, open a few menus, turn on airplane mode, and reop
 menus still load, with a banner saying when they were saved. Days that were never downloaded
 explain why they aren't available. Sample-data builds also have **Settings → Simulate no
 internet**.
+
+### Screenshots
+
+Update the screenshots above before every release:
+
+```sh
+flutter test tool/screenshots   # writes docs/screenshots/*.png
+```
+
+The script renders the app at iPhone size with real fonts, using sample data and real menus
+captured from the feed (`test/fixtures/`). It isn't part of `flutter test`, which only runs
+`test/`. The Map tab is a native view that can't be drawn this way, so a map screenshot has to be
+taken on a device.
 
 ## Architecture
 

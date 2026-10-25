@@ -20,7 +20,12 @@ TZ=Asia/Kolkata flutter test                      # date logic must pass in any 
 flutter run                                       # live University Housing data
 flutter run --dart-define=USE_SAMPLE_DATA=true    # built-in sample data, works offline
 dart run tool/live_feed_check.dart                # hits the live feed, checks it still parses
+flutter test tool/screenshots                     # regenerates docs/screenshots/ for the README
 ```
+
+Regenerate the README screenshots for every release (there are none yet; the repo goes public
+soon), and add or change shots in `tool/screenshots/` when a release changes how the app looks.
+The Map tab can't render in a test, so it needs a device screenshot.
 
 Before every commit, run `flutter analyze` and `flutter test` (and the `TZ=Asia/Kolkata` run when
 dates or times change) and commit only when they pass; don't rely on CI to catch failures. In a

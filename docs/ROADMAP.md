@@ -34,6 +34,13 @@ Decided against for now. If revisited, host on the owner's `web.illinois.edu` si
   custom service worker for offline loading (Flutter no longer generates one), and a CI deploy job.
 - Expect a few-MB first load, and on iPhone the user has to add it to the home screen.
 
+## Releases
+
+None yet: the repo is private for now and will be made public. For every release:
+
+- Regenerate the README screenshots (`flutter test tool/screenshots`) and check they still
+  show the main features. Update `tool/screenshots/` when screens change.
+
 ## Ideas
 
 - **Passkeys for the University sign-in.** Embedded WebViews can't use passkeys for Microsoft's
