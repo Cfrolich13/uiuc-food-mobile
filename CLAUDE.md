@@ -73,6 +73,12 @@ replace weekly `ServiceHours`. `/Menu/{id}/{M-d-yyyy}` gives items: station = `S
 Lunch and Field of Greens), which `statusAt` handles. `test/fixtures/` holds real captured
 responses.
 
+The official Illinois app is open source (Flutter): https://github.com/rokwire/illinois-app, public,
+so `git clone --depth 1` works without attaching it. Check it for how the feed is meant to be used.
+Dining lives in `lib/model/Dining.dart`, `lib/ext/Dining.dart`, `lib/service/Dinings.dart` and
+`lib/ui/explore/ExploreDiningDetailPanel.dart`. It groups menus by `Category` (same as `ServingUnit`
+in practice) and parses `Course`/`CourseSort` but never displays them.
+
 **Map** (`screens/map_screen.dart`, `widgets/campus_map_view.dart`, `data/campus_map.dart`).
 MapLibre (`maplibre_gl`) with OpenFreeMap vector tiles; no API key. Light is OpenFreeMap's
 `liberty`; dark is `assets/map/dark.json`, generated from it by `tool/make_dark_map_style.dart`
