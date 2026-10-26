@@ -41,6 +41,7 @@ class Loader<T> extends ChangeNotifier {
           );
         }
         _set(value);
+        onValue(value);
         if (!value.refreshing) onLoaded(value);
       },
       onDone: () {
@@ -49,6 +50,11 @@ class Loader<T> extends ChangeNotifier {
     );
     return done.future;
   }
+
+  /// Hook for subclasses; called with every value, including the saved copy
+  /// shown while the network attempt is still in flight.
+  @protected
+  void onValue(Loaded<T> value) {}
 
   /// Hook for subclasses; called with each settled (non-refreshing) value.
   @protected

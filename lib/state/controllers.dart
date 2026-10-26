@@ -32,6 +32,8 @@ class HallsController extends Loader<List<DiningHall>> {
 
   /// Today's saved menu per location, for showing open stations on cards.
   Map<String, DailyMenu> _todayMenus = const {};
+  String? _todayMenusDate;
+  int _todayMenusLoads = 0;
 
   Future<void> refresh() => load(repository.halls());
 
@@ -47,25 +49,31 @@ class HallsController extends Loader<List<DiningHall>> {
   }
 
   @override
+  void onValue(Loaded<List<DiningHall>> value) {
+    // Today's menus may already be saved from an earlier sync. Show their
+    // stations right away rather than after the network attempt, which can
+    // take a long time to fail with no signal.
+    if (value.data != null && _todayMenusDate != dateKey(_today())) _loadTodayMenus();
+  }
+
+  @override
   void onLoaded(Loaded<List<DiningHall>> value) {
-    if (value.data == null) return;
-    if (value.error == null) {
-      syncMenus();
-    } else {
-      // Offline: today's menus may already be saved from an earlier sync.
-      _loadTodayMenus();
-    }
+    if (value.data != null && value.error == null) syncMenus();
   }
 
   Future<void> _loadTodayMenus() async {
     final halls = state.data;
     if (halls == null) return;
     final today = _today();
+    _todayMenusDate = dateKey(today);
+    // A slower, earlier read mustn't replace menus read after a sync.
+    final load = ++_todayMenusLoads;
     final menus = <String, DailyMenu>{};
     for (final hall in halls) {
       final menu = await repository.savedMenu(hall.id, today);
       if (menu != null) menus[hall.id] = menu;
     }
+    if (load != _todayMenusLoads) return;
     _todayMenus = menus;
     notifyListeners();
   }
