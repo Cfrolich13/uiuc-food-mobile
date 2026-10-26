@@ -193,6 +193,11 @@ class FavoriteButton extends StatelessWidget {
   }
 }
 
+/// [padding] plus the bottom safe-area inset, for scroll views that draw
+/// under the home indicator / gesture bar but must let their end scroll clear.
+EdgeInsetsGeometry withBottomInset(BuildContext context, EdgeInsetsGeometry? padding) =>
+    (padding ?? EdgeInsets.zero).add(EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom));
+
 /// A vertical list that lays out all of its children up front.
 ///
 /// [ListView] only measures the children near the screen and estimates the
@@ -200,6 +205,9 @@ class FavoriteButton extends StatelessWidget {
 /// and position when children vary a lot in height (a collapsed station vs
 /// an expanded one). Menus and the location list are small enough to lay out
 /// in full, which gives an exact scroll extent and a steady scrollbar.
+///
+/// The list runs to the bottom of the screen and adds the home indicator /
+/// gesture bar inset after its last child, so nothing is cut off early.
 class ExactScrollList extends StatelessWidget {
   const ExactScrollList({
     super.key,
@@ -218,7 +226,7 @@ class ExactScrollList extends StatelessWidget {
   Widget build(BuildContext context) => SingleChildScrollView(
         controller: controller,
         physics: physics,
-        padding: padding,
+        padding: withBottomInset(context, padding),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
       );
 }
