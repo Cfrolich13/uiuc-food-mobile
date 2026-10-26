@@ -472,6 +472,25 @@ void main() {
 
   });
 
+  testWidgets('menus use the full screen height but end clear of the home indicator',
+      (tester) async {
+    // iPhone-style bottom inset for the home indicator.
+    tester.view.padding = FakeViewPadding(bottom: 34 * tester.view.devicePixelRatio);
+    addTearDown(tester.view.resetPadding);
+    await _Harness().pump(tester);
+    await tester.tap(find.text('Ikenberry Dining Center'));
+    await tester.pumpAndSettle();
+
+    final scrollable = find.byType(Scrollable).last;
+    expect(tester.getRect(scrollable).bottom, 932);
+
+    final position = tester.state<ScrollableState>(scrollable).position;
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    final column = find.descendant(of: scrollable, matching: find.byType(Column)).first;
+    expect(tester.getRect(column).bottom, lessThanOrEqualTo(932 - 34 - 24));
+  });
+
   testWidgets('hours sheet stays clear of the Dynamic Island and can be closed', (tester) async {
     // iPhone-style top inset for the status bar and Dynamic Island.
     tester.view.padding = FakeViewPadding(top: 59 * tester.view.devicePixelRatio);

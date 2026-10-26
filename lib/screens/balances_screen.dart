@@ -139,7 +139,7 @@ class BalancesScreen extends StatelessWidget {
         onRefresh: controller.refresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: withBottomInset(context, const EdgeInsets.all(16)),
           children: content,
         ),
       ),

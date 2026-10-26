@@ -73,9 +73,11 @@ class _HallDetailScreenState extends State<HallDetailScreen> {
         listenable: _menu,
         builder: (context, _) {
           final state = _menu.state;
-          // Keeps the end of the menu clear of the home indicator / gesture bar.
+          // The menu scrolls under the home indicator / gesture bar;
+          // ExactScrollList pads its end clear of it.
           return SafeArea(
             top: false,
+            bottom: false,
             child: Column(
               children: [
                 _DayPicker(today: _today, selected: _day, onSelected: _selectDay),

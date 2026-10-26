@@ -69,7 +69,7 @@ class _SignInDiagnosticsScreenState extends State<SignInDiagnosticsScreen> {
           listenable: widget.log,
           builder: (context, _) => ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
+            padding: withBottomInset(context, const EdgeInsets.all(16)),
             children: [
               Text(
                 'Each balance refresh and sign-in is recorded here: the University pages it '
