@@ -62,6 +62,33 @@ None yet: the repo is private for now and will be made public. For every release
   hosting. That sign-in identifies the student but doesn't include balances.
 - **More feed data:** nutrition per item (`/Nutrition/{ItemID}`), dining specials (`/Offers`),
   location photos (`ImageUrl`), and payment types accepted per location.
+- **Dining hall prices.** The feed has no prices: menu items have none, the per-location
+  `MinimumPurchaseAmount`/`AmountErrorMessage` are null, and only `ApplicationInfo` carries a
+  `$5 minimum purchase required.` with no location attached (checked live October 2026, every
+  location including the food truck). Housing's
+  [Costs page](https://www.housing.illinois.edu/cost) does publish per-meal dining hall
+  prices, set once a year, so they could ship as a static table with its year attached. For
+  2026–27:
+
+  | Per meal | Breakfast | Lunch | Dinner |
+  |---|---|---|---|
+  | Guests, Illini Cash or card (before tax) | $12.29 | $15.05 | $18.92 |
+  | Children under 12, with an adult | $3.08 | $3.77 | $4.73 |
+  | Meal plan holders, Dining Dollars | $11.68 | $14.30 | $17.97 |
+
+  The [Meal Plans page](https://www.housing.illinois.edu/dine/meal-plans/meal-plans) still showed
+  2025–26 Dining Dollar prices ($10.68 / $13.30 / $16.98), so take them from the Costs page.
+  Good2Go carry-out costs a one-time $5 container fee. Retail locations (57 North, Caffeinator,
+  TerraByte, Urbana South Market, InfiniTEA, Corner Cafe, the food truck) only say items are
+  "priced individually"; no price list was found online.
+- **Order ahead.** The official app shows an "Order Online" button only when a location's
+  `OnLineOrder` has a `deep_link` for the platform, and every location's is empty. Corner Cafe
+  and Everybody Eats at Ikenberry have only `store_url`s for TouchNet Order Ahead, whose App
+  Store and Google Play listings returned 404 in October 2026. A Housing blog post from early
+  2024 mentioned ordering ahead at 57 North and TerraByte in the Illinois app. If links
+  reappear, a button could open them the same way. (The `TNT_*` fields, set only for
+  Ikenberry, look like a "Give us your feedback" text short code, not TouchNet; the official
+  app doesn't read them.)
 - **Smaller Android download:** `flutter build apk --split-per-abi` gives about 18 MB for
   arm64 instead of about 52 MB.
 - **Android 10 and older:** the app requires Android 11 because older versions don't trust
