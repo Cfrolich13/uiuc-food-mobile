@@ -27,8 +27,8 @@ Regenerate the README screenshots for every release (there are none yet; the rep
 soon), and add or change shots in `tool/screenshots/` when a release changes how the app looks.
 Screenshots show only real data run through the app's parsers, never sample or made-up data.
 Before regenerating, capture the day's feed with
-`dart run tool/live_feed_check.dart --save=tool/screenshots/feed` (needs the live feed, so a
-local session; the cloud proxy fails the University's TLS) and commit it with the images; without
+`dart run tool/live_feed_check.dart --save=tool/screenshots/feed` (needs the live feed; works in
+a cloud session once `tool/cloud_setup.sh` has run) and commit it with the images; without
 a capture the script falls back to `test/fixtures/`. Balances come from the saved MyHousing page
 and transaction searches in `test/fixtures/`, which are the owner's real account.
 
@@ -50,6 +50,9 @@ in tests need it.
 
 On machines whose CA store lacks *emSign Root CA - G1* (the University server's root; phones trust
 it), pass `--ca-file=<pem>` to `tool/live_feed_check.dart`. Dart ignores `SSL_CERT_FILE`.
+Cloud containers lack it too; `tool/cloud_setup.sh` adds it to the system store, which Dart reads.
+`curl` there uses `SSL_CERT_FILE` (the proxy's bundle), so give it
+`--cacert /etc/ssl/certs/ca-certificates.crt` for the feed.
 
 CI (`.github/workflows/build.yml`) runs analyze + test once, then builds an unsigned `.ipa`
 (macOS) and a release `.apk` (Linux, JDK 21, which `maplibre_gl` needs) in parallel, uploaded unarchived. The APK is signed with the
