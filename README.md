@@ -128,16 +128,18 @@ internet**.
 
 ### Screenshots
 
-Update the screenshots above before every release:
+Update the screenshots above before every release. They show real data only:
 
 ```sh
-flutter test tool/screenshots   # writes docs/screenshots/*.png
+dart run tool/live_feed_check.dart --save=tool/screenshots/feed   # save today's feed
+flutter test tool/screenshots                                    # writes docs/screenshots/*.png
 ```
 
-The script renders the app at iPhone size with real fonts, using sample data and real menus
-captured from the feed (`test/fixtures/`). It isn't part of `flutter test`, which only runs
-`test/`. The Map tab is a native view that can't be drawn this way, so a map screenshot has to be
-taken on a device.
+The script renders the app at iPhone size with real fonts, at lunchtime on the day the feed was
+saved (or from `test/fixtures/` if nothing was saved). Balances come from a saved MyHousing page
+and transaction history (`test/fixtures/meal_plan_*`). It isn't part of `flutter test`, which
+only runs `test/`. The Map tab is a native view that can't be drawn this way, so a map screenshot
+has to be taken in the iOS Simulator or on a device (see `CLAUDE.md`).
 
 ## Architecture
 

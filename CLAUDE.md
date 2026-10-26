@@ -25,7 +25,22 @@ flutter test tool/screenshots                     # regenerates docs/screenshots
 
 Regenerate the README screenshots for every release (there are none yet; the repo goes public
 soon), and add or change shots in `tool/screenshots/` when a release changes how the app looks.
-The Map tab can't render in a test, so it needs a device screenshot.
+Screenshots show only real data run through the app's parsers, never sample or made-up data.
+Before regenerating, capture the day's feed with
+`dart run tool/live_feed_check.dart --save=tool/screenshots/feed` (needs the live feed, so a
+local session; the cloud proxy fails the University's TLS) and commit it with the images; without
+a capture the script falls back to `test/fixtures/`. Balances come from the saved MyHousing page
+and transaction searches in `test/fixtures/`, which are the owner's real account.
+
+The Map tab can't render in a test. On a Mac, take it (or any real-device shot) in the iOS
+Simulator, with live data:
+
+```sh
+open -a Simulator && flutter run                  # boots an iPhone, runs against the live feed
+xcrun simctl status_bar booted override --time 9:41 --batteryState charged --batteryLevel 100
+xcrun simctl ui booted appearance dark            # or light
+xcrun simctl io booted screenshot docs/screenshots/5_map_dark.png
+```
 
 Before every commit, run `flutter analyze` and `flutter test` (and the `TZ=Asia/Kolkata` run when
 dates or times change) and commit only when they pass; don't rely on CI to catch failures. In a

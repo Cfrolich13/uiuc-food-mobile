@@ -38,8 +38,10 @@ Decided against for now. If revisited, host on the owner's `web.illinois.edu` si
 
 None yet: the repo is private for now and will be made public. For every release:
 
-- Regenerate the README screenshots (`flutter test tool/screenshots`) and check they still
-  show the main features. Update `tool/screenshots/` when screens change.
+- Save the day's feed (`dart run tool/live_feed_check.dart --save=tool/screenshots/feed`),
+  regenerate the README screenshots (`flutter test tool/screenshots`) and check they still show
+  the main features with real data. Update `tool/screenshots/` when screens change.
+- Take a Map screenshot in the iOS Simulator and add it to the README table.
 
 ## Ideas
 
