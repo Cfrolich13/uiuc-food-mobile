@@ -184,6 +184,32 @@ void main() {
     expect(find.text('Menu not saved for offline use'), findsOneWidget);
   });
 
+  testWidgets('cards list saved stations before a slow offline attempt fails', (tester) async {
+    final first = _Harness();
+    await first.pump(tester); // Saves today's menus.
+    final stations = find.textContaining('Grill');
+    expect(stations, findsWidgets);
+
+    // Relaunch with no signal: the feed takes a long time to give up.
+    await tester.pumpWidget(const SizedBox());
+    final api = DemoDiningApi(latency: const Duration(seconds: 30), now: () => _now)
+      ..offline = true;
+    await tester.pumpWidget(IlliniDiningApp(
+      repository: DiningRepository(
+          diningApi: api, balanceApi: api, cache: first.cache, now: () => _now),
+      preferences: await SharedPreferences.getInstance(),
+      clock: Clock(() => _now),
+      mapView: _fakeMapView,
+    ));
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('Offline'), findsNothing, reason: 'still trying');
+    expect(stations, findsWidgets);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(minutes: 1)); // let pending requests finish
+  });
+
   testWidgets('saved data shows at once while refreshing, with no spinner', (tester) async {
     final harness = _Harness(latency: const Duration(seconds: 1));
     await harness.pump(tester, settle: false);
